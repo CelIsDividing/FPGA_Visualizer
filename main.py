@@ -10,8 +10,6 @@ import re
 import json
 import time
 import matplotlib.pyplot as plt
-from visualization.congestion_visualizer import CongestionVisualizer
-from visualization.web_visualizer import WebVisualizer
 from flask_cors import CORS
 from typing import Dict, List, Optional
 from flask import Flask, render_template, request, jsonify, send_file
@@ -28,7 +26,6 @@ from parsers.circuit_parser import CircuitParser
 from parsers.routing_parser import RoutingParser
 from visualization.signal_visualizer import SignalVisualizer
 from analysis.conflict_graph import ConflictGraphBuilder
-from analysis.statistics_calculator import StatisticsCalculator
 
 # Globalne promenljive za keširane podatke
 cached_routing = None
@@ -42,8 +39,6 @@ class FPGAVisualizationApp:
     def __init__(self):
         self.app = Flask(__name__)
         self.app.config['UPLOAD_FOLDER'] = settings.UPLOAD_FOLDER
-        self.congestion_visualizer = CongestionVisualizer()
-        self.web_visualizer = WebVisualizer()
         
         CORS(self.app)
 
@@ -53,7 +48,6 @@ class FPGAVisualizationApp:
         self.routing_parser = RoutingParser()
         self.signal_visualizer = SignalVisualizer()
         self.conflict_builder = ConflictGraphBuilder()
-        self.stats_calculator = StatisticsCalculator()
         
         # Podaci aplikacije
         self.current_architecture: Optional[FPGAArchitecture] = None
@@ -482,14 +476,11 @@ class FPGAVisualizationApp:
             """Ruta za analizu konflikata - radi sa routing ili circuit podacima"""
             global cached_routing
             
-            # Uzmi selektovane signale iz POST requesta
             data = request.get_json(silent=True) or {}
             selected_signals = data.get('selected_signals', [])
             
-            # Prvo proveri da li postoji učitani routing (prioritet)
             if cached_routing:
                 try:
-                    # Filtriraj routing da sadrži samo selektovane signale
                     if selected_signals:
                         filtered_routing = RoutingResult(
                             routes=[route for route in cached_routing.routes 
@@ -505,11 +496,9 @@ class FPGAVisualizationApp:
                     hubs = self.conflict_builder.identify_hubs()
                     metrics = self.conflict_builder.calculate_graph_metrics()
                     
-                    # Vizuelizacija konflikt grafa
                     fig = self.conflict_builder.visualize_conflict_graph()
                     os.makedirs(settings.OUTPUT_FOLDER, exist_ok=True)
                     
-                    # Generiši jedinstveno ime sa timestamp
                     ts = int(time.time())
                     filename = f'conflict_graph_{ts}.png'
                     conflict_viz_path = os.path.join(settings.OUTPUT_FOLDER, filename)
@@ -520,7 +509,7 @@ class FPGAVisualizationApp:
                         'success': True,
                         'hubs': hubs,
                         'metrics': metrics,
-                        'conflict_viz_path': f'output/{filename}',  # Relativna putanja za frontend
+                        'conflict_viz_path': f'output/{filename}',
                         'num_signals': len(filtered_routing.routes)
                     })
                     
@@ -529,7 +518,6 @@ class FPGAVisualizationApp:
                     traceback.print_exc()
                     return jsonify({'error': str(e)}), 400
             
-            # Fallback na circuit ako postoji
             elif self.current_circuit:
                 try:
                     conflict_graph = self.conflict_builder.build_conflict_graph(self.current_circuit)

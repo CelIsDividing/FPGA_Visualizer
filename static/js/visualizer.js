@@ -21,14 +21,9 @@ class FPGAVisualizer {
     initEventListeners() {
         console.log("🔧 Inicijalizujem event listenere...");
         
-        // Ručno poveži sve dugmad - PREKIDAMO onclick atribute
-        this.bindButton('.demo-btn', () => this.createDemo());
-        this.bindButton('#uploadArchBtn', () => this.uploadArchitecture());
-        this.bindButton('#uploadCircuitBtn', () => this.uploadCircuit());
-        this.bindButton('#uploadRoutingBtn', () => this.uploadRouting());
+        // Ručno poveži sve dugmad
         this.bindButton('#visualizeBtn', () => this.visualizeSelectedSignals());
-        this.bindButton('#analyzeBtn', () => this.analyzeConflicts());
-        this.bindButton('#statsBtn', () => this.showStatistics());
+        this.bindButton('#analyzeBtn', () => this.analyzeConflicts());  // Ispravljeno: analyzeBtn umesto analyzeConflictsBtn
         
         // Poveži file input change event-e
         this.bindFileInput('archFile', () => this.onArchFileSelected());
@@ -57,10 +52,6 @@ class FPGAVisualizer {
         });
 
         console.log("✅ Event listeneri inicijalizovani");
-
-        if (this.btnVisualize) {
-            this.btnVisualize.addEventListener('click', () => this.visualizeSignals());
-        }
     }
 
     bindButton(selector, handler) {
@@ -437,35 +428,6 @@ class FPGAVisualizer {
         }
     }
 
-    async createDemo() {
-        if (this.uploadInProgress) {
-            this.showMessage('Upload je u toku, sačekajte...', 'info');
-            return;
-        }
-
-        this.showMessage('Kreiram demo podatke...', 'info');
-        
-        try {
-            const response = await fetch('/demo');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.showMessage('Demo podaci uspešno kreirani!', 'success');
-                this.currentArchitecture = data.architecture;
-                this.currentCircuit = data.circuit;
-                this.currentRouting = data.routing;
-                this.updateStatus();
-            } else {
-                this.showMessage(data.error, 'error');
-            }
-        } catch (error) {
-            console.error('Greška:', error);
-            this.showMessage('Greška: ' + error.message, 'error');
-        }
-    }
-
     async uploadArchitecture() {
         if (this.uploadInProgress) {
             this.showMessage('Upload je u toku, sačekajte...', 'info');
@@ -532,130 +494,6 @@ class FPGAVisualizer {
         }
     }
 
-    async uploadRouting() { 
-        if (this.uploadInProgress) {
-            this.showMessage('⏳ Upload je u toku, sačekajte...', 'info');
-            return;
-        }
-
-        const fileInput = document.getElementById('routingFile');
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            this.showMessage('📁 Molimo odaberite .route fajl', 'error');
-            return;
-        }
-
-        const file = fileInput.files[0];
-        if (!file.name.toLowerCase().endsWith('.route')) {
-            this.showMessage('❌ Podržani format: .route', 'error');
-            this.resetFileInput('routingFile');
-            return;
-        }
-
-        if (!this.currentArchitecture) {
-            this.showMessage('❌ Prvo učitajte arhitekturu (.xml) pre rutiranja', 'error');
-            return;
-        }
-
-        this.uploadInProgress = true;
-        this.showMessage('🔄 Učitavam rutiranje...', 'info');
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            console.log('📤 Šaljem routing:', file.name);
-            const response = await fetch('/upload/routing', {
-                method: 'POST',
-                body: formData
-            });
-
-            console.log('📥 Status:', response.status);
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Server error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('📊 Odgovor:', data);
-
-            if (data.success) {
-                this.showMessage('✅ Rutiranje uspešno učitano!', 'success');
-                this.currentRouting = data.routing;
-                this.updateStatus();
-            } else {
-                this.showMessage('❌ ' + data.error, 'error');
-            }
-        } catch (error) {
-            console.error('💥 Greška:', error);
-            this.showMessage('💥 Greška: ' + error.message, 'error');
-        } finally {
-            this.uploadInProgress = false;
-        }
-    }
-
-    async uploadCircuit() {
-        if (this.uploadInProgress) {
-            this.showMessage('⏳ Upload je u toku, sačekajte...', 'info');
-            return;
-        }
-
-        const fileInput = document.getElementById('circuitFile');
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            this.showMessage('📁 Molimo odaberite Verilog ili BLIF fajl', 'error');
-            return;
-        }
-
-        const file = fileInput.files[0];
-        
-        // Proveri tip fajla
-        const fileName = file.name.toLowerCase();
-        if (!fileName.endsWith('.v') && !fileName.endsWith('.blif')) {
-            this.showMessage('❌ Podržani formati: .v (Verilog) ili .blif', 'error');
-            this.resetFileInput('circuitFile');
-            return;
-        }
-
-        this.uploadInProgress = true;
-        this.showMessage('🔄 Učitavam kolo...', 'info');
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            console.log('📤 Šaljem kolo:', file.name);
-            
-            const response = await fetch('/upload/circuit', {
-                method: 'POST',
-                body: formData
-            });
-            
-            console.log('📥 Status:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Server error: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            console.log('📊 Odgovor:', data);
-            
-            if (data.success) {
-                this.showMessage('✅ Kolo uspešno učitano!', 'success');
-                this.currentCircuit = data.circuit;
-                this.updateStatus();
-            } else {
-                this.showMessage('❌ ' + data.error, 'error');
-            }
-            
-        } catch (error) {
-            console.error('💥 Greška:', error);
-            this.showMessage('💥 Greška: ' + error.message, 'error');
-        } finally {
-            this.uploadInProgress = false;
-            // NE resetuj file input ovde
-        }
-    }
-
     resetFileInput(inputId) {
         const fileInput = document.getElementById(inputId);
         if (fileInput) {
@@ -664,28 +502,13 @@ class FPGAVisualizer {
         }
     }
 
-    async visualizeSignals() {
-        this.visualizeSelectedSignals();
-    }
-
-    setAreaMessage(text, color = '#333') {
-        if (!this.area) return;
-        this.area.innerHTML = `<p class="small center" style="padding:40px;color:${color}">${text}</p>`;
-    }
-
     async analyzeConflicts() {
-        console.log('🔍 analyzeConflicts() pozvana');
-        
-        // Proveri da li je učitan routing ili circuit
         if (!this.currentRouting && !this.currentCircuit) {
-            console.log('❌ Nema učitanog routing-a ili circuit-a');
             this.showMessage('Prvo učitajte rutiranje (.route fajl)', 'error');
             return;
         }
 
-        // Prikupi selektovane signale
         const selectedSignals = this.getSelectedSignals();
-        console.log(`📋 Selektovano signala: ${selectedSignals.length}`, selectedSignals);
         
         if (selectedSignals.length === 0) {
             this.showMessage('Molimo selektujte bar jedan signal', 'error');
@@ -695,7 +518,6 @@ class FPGAVisualizer {
         this.showMessage(`Analiziram konflikte za ${selectedSignals.length} signala...`, 'info');
 
         try {
-            console.log('📤 Šaljem POST zahtev na /analysis/conflicts');
             const response = await fetch('/analysis/conflicts', {
                 method: 'POST',
                 headers: {
@@ -706,12 +528,9 @@ class FPGAVisualizer {
                 })
             });
             
-            console.log(`📥 Response status: ${response.status}`);
-            
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const data = await response.json();
-            console.log('📊 Response data:', data);
             
             if (data.success) {
                 this.showMessage(`Analiza konflikata završena za ${data.num_signals || selectedSignals.length} signala!`, 'success');
@@ -720,34 +539,8 @@ class FPGAVisualizer {
                 this.showMessage(data.error, 'error');
             }
         } catch (error) {
-            console.error('💥 Greška:', error);
+            console.error('Greška:', error);
             this.showMessage('Greška: ' + error.message, 'error');
-        }
-    }
-
-    async showStatistics() {
-        if (!this.currentCircuit || !this.currentArchitecture) {
-            this.showMessage('Prvo učitajte kolo i arhitekturu', 'error');
-            return;
-        }
-
-        this.showMessage('Računam statistiku...', 'info');
-
-        try {
-            const response = await fetch('/analysis/statistics');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.showMessage('✅ Statistika uspešno izračunata!', 'success');
-                this.displayStatistics(data.statistics);
-            } else {
-                this.showMessage('❌ ' + data.error, 'error');
-            }
-        } catch (error) {
-            console.error('💥 Greška:', error);
-            this.showMessage('💥 Greška: ' + error.message, 'error');
         }
     }
 
@@ -807,9 +600,7 @@ class FPGAVisualizer {
                         <div class="image-container">
                             <img src="/download/${conflictFilename}${bust}" 
                                  alt="Conflict Graph" 
-                                 class="visualization-image"
-                                 onload="console.log('Konflikt graf učitan!');"
-                                 onerror="this.onerror=null; console.error('Greška pri učitavanju konflikt grafa');">
+                                 class="visualization-image">
                         </div>
                         <div class="image-actions">
                             <a href="/download/${conflictFilename}" download class="download-link">Preuzmi sliku</a>
@@ -835,43 +626,7 @@ class FPGAVisualizer {
             </div>
         `;
         
-        // Scroll do rezultata
         resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    displayStatistics(stats) {
-        const statsDiv = document.getElementById('statisticsResults');
-        if (!statsDiv) return;
-        
-        let statsHtml = '';
-        for (const [key, value] of Object.entries(stats)) {
-            const displayValue = typeof value === 'number' ? value.toFixed(3) : value;
-            statsHtml += `
-                <tr>
-                    <td>${key}</td>
-                    <td>${displayValue}</td>
-                </tr>
-            `;
-        }
-        
-        statsDiv.innerHTML = `
-            <div class="results-section">
-                <h3>📊 Statistička Analiza</h3>
-                <div class="table-container">
-                    <table class="stats-table">
-                        <thead>
-                            <tr>
-                                <th>Metrika</th>
-                                <th>Vrednost</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${statsHtml}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
     }
 
     normalizeImagePath(fullPath) {
@@ -882,15 +637,10 @@ class FPGAVisualizer {
     }
 
     updateStatus() {
-        console.log('🔄 Status aplikacije:', {
-            'Arhitektura': this.currentArchitecture ? '✅ Učitana' : '❌ Nije učitana',
-            'Kolo': this.currentCircuit ? '✅ Učitano' : '❌ Nije učitano',
-            'Rutiranje': this.currentRouting ? '✅ Učitano' : '❌ Nije učitano'
-        });
+        // Status info
     }
 
     showMessage(message, type) {
-        console.log(`[${type.toUpperCase()}] ${message}`);
         
         const existingMessages = document.querySelectorAll('.status-message');
         existingMessages.forEach(msg => msg.remove());
