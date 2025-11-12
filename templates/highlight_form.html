@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal Highlighting - FPGA Visualizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .highlight-form {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .signal-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        
+        .highlight-btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .highlight-btn:hover {
+            background: #0056b3;
+        }
+        
+        .example-signals {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .quick-highlight {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px 10px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #495057;
+        }
+        
+        .quick-highlight:hover {
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Signal Highlighting</h1>
+        
+        <div class="highlight-form">
+            <h2>Highlight Specific Signals</h2>
+            <p>Enter signal node IDs separated by commas to highlight them in the visualization:</p>
+            
+            <form action="/visualize" method="GET">
+                <input type="text" 
+                       name="highlight" 
+                       class="signal-input"
+                       placeholder="e.g., 1683, 1271, 817"
+                       pattern="[0-9,\s]+"
+                       title="Enter signal IDs separated by commas">
+                
+                <button type="submit" class="highlight-btn">
+                    🎯 Generate Highlighted Visualization
+                </button>
+            </form>
+            
+            <div class="example-signals">
+                <h3>Quick Examples</h3>
+                <p>Click to highlight common signals from Net 10:</p>
+                
+                <a href="/visualize?highlight=1683" class="quick-highlight">
+                    🔴 Signal 1683 (CHANY 5,4)
+                </a>
+                
+                <a href="/visualize?highlight=1271" class="quick-highlight">
+                    🟢 Signal 1271 (CHANX 6,3)
+                </a>
+                
+                <a href="/visualize?highlight=1683,1271" class="quick-highlight">
+                    🎯 Both Target Signals
+                </a>
+                
+                <a href="/visualize?highlight=817,826" class="quick-highlight">
+                    📍 SOURCE & OPIN (817,826)
+                </a>
+                
+                <a href="/visualize?highlight=887,747" class="quick-highlight">
+                    📥 IPIN Nodes (887,747)
+                </a>
+                
+                <a href="/visualize?highlight=882,738" class="quick-highlight">
+                    🎯 SINK Nodes (882,738)
+                </a>
+                
+                <a href="/visualize" class="quick-highlight">
+                    🔘 No Highlighting (Normal View)
+                </a>
+            </div>
+            
+            <div class="example-signals">
+                <h3>💡 Tips</h3>
+                <ul>
+                    <li><strong>Red signals:</strong> Node 1683 and similar IDs</li>
+                    <li><strong>Green signals:</strong> Node 1271 and similar IDs</li>
+                    <li><strong>Yellow signals:</strong> Other highlighted nodes</li>
+                    <li><strong>Thick lines:</strong> All highlighted signals use thicker lines</li>
+                    <li><strong>Higher priority:</strong> Highlighted signals are drawn on top</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/" style="color: #007bff; text-decoration: none;">← Back to Main Page</a>
+        </div>
+    </div>
+</body>
+</html>

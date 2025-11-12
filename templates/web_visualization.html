@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPGA Web Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .visualization { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; }
+        .controls { margin-bottom: 20px; padding: 15px; background: #f5f5f5; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        img { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FPGA Web Visualization</h1>
+        
+        <div class="controls">
+            <button onclick="loadDemoData()">Učitaj Demo Podatke</button>
+            <button onclick="generateCongestionVisualization()">Vizuelizacija Zagušenja</button>
+            <button onclick="generateSignalVisualization()">Vizuelizacija Signalа</button>
+            <button onclick="analyzeConflicts()">Analiza Konflikata</button>
+            <button onclick="showStatistics()">Statistika</button>
+        </div>
+
+        <div class="grid">
+            <div class="visualization">
+                <h3>Vizuelizacija Zagušenja</h3>
+                <div id="congestion-container">
+                    <img id="congestion-image" style="display: none;">
+                    <div id="congestion-plot"></div>
+                </div>
+            </div>
+
+            <div class="visualization">
+                <h3>Vizuelizacija Signalа</h3>
+                <div id="signals-container">
+                    <img id="signals-image" style="display: none;">
+                    <div id="signals-plot"></div>
+                </div>
+            </div>
+
+            <div class="visualization">
+                <h3>Graf Konflikata</h3>
+                <div id="conflicts-container">
+                    <img id="conflicts-image" style="display: none;">
+                    <div id="conflicts-plot"></div>
+                </div>
+            </div>
+
+            <div class="visualization">
+                <h3>Statistika</h3>
+                <div id="statistics-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadDemoData() {
+            try {
+                const response = await fetch('/demo');
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Demo podaci uspešno učitani!');
+                    // Automatski generiši vizuelizacije
+                    generateCongestionVisualization();
+                    generateSignalVisualization();
+                } else {
+                    alert('Greška: ' + data.error);
+                }
+            } catch (error) {
+                alert('Greška pri učitavanju demo podataka: ' + error);
+            }
+        }
+
+        async function generateCongestionVisualization() {
+            try {
+                // Generiši vizuelizaciju zagušenja
+                const response = await fetch('/visualize/congestion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ visualization_type: 'current' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Prikaži sliku
+                    const img = document.getElementById('congestion-image');
+                    img.src = data.image_path + '?t=' + new Date().getTime();
+                    img.style.display = 'block';
+                    
+                    // Prikaži izveštaj
+                    document.getElementById('congestion-container').innerHTML += 
+                        `<div><strong>Izveštaj:</strong> Max zagušenje: ${data.report.max_congestion.toFixed(2)}</div>`;
+                } else {
+                    alert('Greška: ' + data.error);
+                }
+            } catch (error) {
+                alert('Greška pri generisanju vizuelizacije zagušenja: ' + error);
+            }
+        }
+
+        async function generateSignalVisualization() {
+            try {
+                const response = await fetch('/visualize/signals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        signal_names: [], // Svi signali
+                        show_grid: true 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const img = document.getElementById('signals-image');
+                    img.src = data.image_path + '?t=' + new Date().getTime();
+                    img.style.display = 'block';
+                } else {
+                    alert('Greška: ' + data.error);
+                }
+            } catch (error) {
+                alert('Greška pri generisanju vizuelizacije signala: ' + error);
+            }
+        }
+
+        async function analyzeConflicts() {
+            try {
+                const response = await fetch('/analysis/conflicts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const img = document.getElementById('conflicts-image');
+                    img.src = data.conflict_viz_path + '?t=' + new Date().getTime();
+                    img.style.display = 'block';
+                    
+                    // Prikaži metrike
+                    document.getElementById('conflicts-container').innerHTML += 
+                        `<div>
+                            <strong>Metrike:</strong><br>
+                            Habovi: ${data.hubs.length}<br>
+                            Gustina: ${data.metrics.density.toFixed(2)}
+                        </div>`;
+                } else {
+                    alert('Greška: ' + data.error);
+                }
+            } catch (error) {
+                alert('Greška pri analizi konflikata: ' + error);
+            }
+        }
+
+        async function showStatistics() {
+            try {
+                const response = await fetch('/analysis/statistics');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.statistics;
+                    document.getElementById('statistics-container').innerHTML = `
+                        <div>
+                            <strong>Osnovna statistika:</strong><br>
+                            Broj signala: ${stats.total_signals}<br>
+                            Ukupna dužina: ${stats.total_wire_length.toFixed(2)}<br>
+                            Prosečna dužina: ${stats.average_wire_length.toFixed(2)}<br>
+                            Maksimalna dužina: ${stats.max_wire_length.toFixed(2)}
+                        </div>
+                    `;
+                } else {
+                    alert('Greška: ' + data.error);
+                }
+            } catch (error) {
+                alert('Greška pri prikazu statistike: ' + error);
+            }
+        }
+    </script>
+</body>
+</html>
