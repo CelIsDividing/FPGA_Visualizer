@@ -1,0 +1,1105 @@
+================================================================================
+                    FPGA VISUALIZER - ANALIZA PROJEKTA
+================================================================================
+                    Proces razvoja informacionih sistema 2025
+================================================================================
+
+SADRŽAJ:
+1. main.py
+2. config/settings.py
+3. models/circuit.py
+4. models/routing.py
+5. models/fpga_architecture.py
+6. parsers/architecture_parser.py
+7. parsers/circuit_parser.py
+8. parsers/routing_parser.py
+9. visualization/signal_visualizer.py
+10. analysis/conflict_graph.py
+11. analysis/advanced_analyzer.py
+
+================================================================================
+1. FAJL: main.py
+================================================================================
+
+OPIS:
+Glavna aplikacija FPGA vizuelizacionog alata. Flask web aplikacija koja 
+koordiniše sve komponente sistema.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: FPGAVisualizationApp
+Opis: Glavna klasa FPGA vizuelizacionog alata
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self)
+    Inicijalizuje Flask aplikaciju, parsere, vizualizere i konfiguriše CORS.
+    Postavlja trenutne podatke (architecture, circuit, routing) na None.
+
+_setup_routes(self)
+    Podešava sve Flask rute za web aplikaciju.
+    Definiše endpointe za upload fajlova, vizualizaciju, analizu i preuzimanje.
+
+@app.route('/')
+def index()
+    Renderuje glavnu HTML stranicu aplikacije.
+
+@app.route('/upload/architecture', methods=['POST'])
+def upload_architecture()
+    Ruta za upload FPGA arhitekture (.xml fajl).
+    Parsira XML fajl i učitava arhitekturu koristeći ArchitectureParser.
+    Vraća JSON odgovor sa parsiranom arhitekturom ili greškom.
+
+@app.route('/upload/routing', methods=['POST'])
+def upload_routing()
+    Ruta za upload routing rezultata (.route fajl).
+    Zahteva da arhitektura bude prethodno učitana.
+    Parsira .route fajl i vraća routing podatke.
+
+@app.route('/api/parse_routing', methods=['POST'])
+def parse_routing()
+    Parse .route fajl i vraća listu signala.
+    Ekstrahuje dimenzije iz fajla, kreira arhitekturu ako ne postoji,
+    i vraća informacije o signalima (net_name, segment_count, fanout).
+
+@app.route('/upload/circuit', methods=['POST'])
+def upload_circuit()
+    Ruta za upload kola (.v ili .blif fajl).
+    Parsira Verilog ili BLIF fajl i vraća podatke o kolu.
+
+@app.route('/api/visualize', methods=['POST'])
+def visualize_selected_signals()
+    Vizuelizuje samo selektovane signale.
+    Prima JSON sa listom signala i opcijama prikaza (grid, directions, heatmap).
+    Filtrira rute i generiše PNG sliku vizualizacije.
+
+@app.route('/visualize/signals', methods=['POST'])
+def visualize_signals()
+    Endpoint za vizuelizaciju rutiranja (sliku čuva u OUTPUT folder).
+    Generiše timestamp-ovanu sliku routing vizualizacije.
+
+@app.route('/analysis/conflicts', methods=['POST'])
+def analyze_conflicts()
+    Ruta za analizu konflikata - radi sa routing ili circuit podacima.
+    Gradi konflikt graf, identifikuje habove, računa metrike.
+    Generiše i čuva vizualizaciju konflikt grafa.
+
+@app.route('/analysis/statistics', methods=['GET'])
+def get_statistics()
+    Ruta za statističku analizu.
+    Računa kompleksne statistike za kolo i arhitekturu.
+
+@app.route('/demo', methods=['GET'])
+def create_demo()
+    Ruta za kreiranje demo podataka.
+    Generiše test arhitekturu (3x10) i test kolo sa 14 signala.
+
+@app.route('/download/<path:filename>')
+def download_file(filename)
+    Ruta za preuzimanje generisanih fajlova iz OUTPUT foldera.
+    Validira filename radi bezbednosti.
+
+@app.route('/static/output/<path:filename>')
+def static_output_file(filename)
+    Ruta za statičke fajlove iz output foldera.
+
+@app.route('/visualize/congestion', methods=['POST'])
+def visualize_congestion()
+    Ruta za vizuelizaciju zagušenja.
+    Generiše heat mapu zagušenja i izveštaj.
+
+@app.route('/web/data', methods=['GET'])
+def get_web_data()
+    Ruta za web vizualizacione podatke.
+    Kreira JSON podatke za interaktivnu vizualizaciju.
+
+run(self, host=None, port=None, debug=None)
+    Pokreće Flask aplikaciju.
+    Kreira potrebne direktorijume, proverava permissions,
+    i ispisuje sve registrovane rute.
+
+main()
+    Glavna funkcija za pokretanje aplikacije.
+    Instancira FPGAVisualizationApp i pokreće server.
+
+
+================================================================================
+2. FAJL: config/settings.py
+================================================================================
+
+OPIS:
+Konfiguracioni fajl sa svim podešavanjima aplikacije.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: Settings (dataclass)
+Opis: Kontejner za sve konfiguracione parametre aplikacije
+
+Atributi:
+    UPLOAD_FOLDER: Putanja do foldera za upload ("uploads")
+    OUTPUT_FOLDER: Putanja do foldera za output ("output")
+    STATIC_FOLDER: Putanja do static foldera ("static")
+    CELL_SIZE: Veličina ćelije za vizualizaciju (100)
+    CANVAS_PADDING: Padding oko canvas-a (100)
+    SIGNAL_COLORS: Lista boja za signale
+    CONGESTION_THRESHOLD: Prag za zagušenje (0.8)
+    HUB_CENTRALITY_THRESHOLD: Prag za hub centralnost (0.1)
+    HOST: Web server host ("localhost")
+    PORT: Web server port (5000)
+    DEBUG: Debug mode (True)
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+(Nema metoda - samo dataclass atributi)
+
+Na kraju fajla:
+    Kreira se globalna instanca 'settings'
+    Kreiranje direktorijuma ako ne postoje
+
+
+================================================================================
+3. FAJL: models/circuit.py
+================================================================================
+
+OPIS:
+Model klase za reprezentaciju digitalnog kola i njegovih signala.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: Signal (dataclass)
+Opis: Reprezentuje jedan signal u kolu
+
+Atributi:
+    name: Ime signala
+    source: Tačka izvora signala (Optional[Point])
+    destination: Tačka destinacije (Optional[Point])
+    route: Lista tačaka koje čine rutu signala
+    length: Dužina signala
+    is_excluded: Da li je signal isključen iz analize
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+calculate_length(self) -> float
+    Računa dužinu signala na osnovu rute.
+    Koristi Euklidsko rastojanje između susednih tačaka u ruti.
+
+get_bounding_box(self) -> BoundingBox
+    Vraća bounding box signala.
+    Nalazi min/max X i Y koordinate iz rute.
+
+------------------------------------------------------------------------
+Klasa: Component (dataclass)
+Opis: Reprezentuje hardversku komponentu u kolu
+
+Atributi:
+    name: Ime komponente
+    type: Tip komponente (LUT, FF, itd.)
+    position: Pozicija komponente (Point)
+    inputs: Lista ulaznih pinova
+    outputs: Lista izlaznih pinova
+
+------------------------------------------------------------------------
+Klasa: Circuit (dataclass)
+Opis: Reprezentuje celokupno kolo sa signalima i komponentama
+
+Atributi:
+    name: Ime kola
+    signals: Lista signala
+    components: Lista komponenti
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+add_signal(self, signal: Signal)
+    Dodaje signal u kolo.
+
+add_component(self, component: Component)
+    Dodaje komponentu u kolo.
+
+get_signal(self, name: str) -> Optional[Signal]
+    Vraća signal po imenu.
+    Prolazi kroz sve signale i vraća onaj sa odgovarajućim imenom.
+
+exclude_signals(self, signal_names: List[str])
+    Isključuje signale iz analize.
+    Označava signale sa datim imenima kao is_excluded=True.
+
+include_signals(self, signal_names: List[str])
+    Uključuje signale u analizu.
+    Označava signale sa datim imenima kao is_excluded=False.
+
+get_active_signals(self) -> List[Signal]
+    Vraća signale koji nisu isključeni.
+    Filtrira samo signale gde is_excluded=False.
+
+calculate_total_wire_length(self) -> float
+    Računa ukupnu dužinu žica za aktivne signale.
+    Sumira calculate_length() za sve aktivne signale.
+
+to_dict(self) -> Dict
+    Konvertuje kolo u dictionary za JSON serijalizaciju.
+    Konvertuje sve signale i komponente u dictionary format.
+
+@classmethod from_dict(cls, data: Dict) -> 'Circuit'
+    Kreira Circuit iz dictionary.
+    Rekonstruiše Circuit objekat iz JSON-like dictionary-ja.
+
+
+================================================================================
+4. FAJL: models/routing.py
+================================================================================
+
+OPIS:
+Model klase za reprezentaciju routing rezultata i stabala.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: RouteSegment
+Opis: Čvor u routing stablu (ne samo segment!)
+
+Atributi:
+    node_id: ID čvora
+    node_type: Tip čvora (SOURCE, OPIN, CHANX, CHANY, IPIN, SINK)
+    x, y: Koordinate čvora
+    track: Broj track-a u kanalu
+    switch_id: ID switch-a
+    pad: Broj pad-a (za IO blokove)
+    children: Lista dece u stablu
+    parent: Roditelj u stablu
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+is_io_pad(self) -> bool
+    Da li je IO pad (SOURCE/SINK sa Pad oznakom).
+    Proverava da li je pad >= 0.
+
+add_child(self, child)
+    Dodaj dete čvor u stablo.
+    Postavlja parent link na dete.
+
+is_leaf(self) -> bool
+    Da li je list (SINK čvor).
+    Proverava da li nema dece i da je tip SINK.
+
+is_root(self) -> bool
+    Da li je koren (SOURCE čvor).
+    Proverava da li nema roditelja i da je tip SOURCE.
+
+get_path_to_root(self) -> List[RouteSegment]
+    Vraća putanju od ovog čvora do korena.
+    Kreće od trenutnog čvora i prati parent linkove.
+
+get_all_paths_to_leaves(self) -> List[List[RouteSegment]]
+    Rekurzivno vraća sve putanje od ovog čvora do listova.
+    DFS traversal kroz stablo.
+
+to_dict(self, include_children=False) -> Dict
+    Serijalizacija u dict.
+    Opciono uključuje i child čvorove.
+
+------------------------------------------------------------------------
+Klasa: NetRoute
+Opis: Routing stablo za jedan net
+
+Atributi:
+    net_name: Ime net-a
+    segments: Flat lista segmenata (za legacy)
+    root: Koren stabla (SOURCE čvor)
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+build_tree_from_segments(self)
+    Konvertuje linearnu listu segmenata u stablo koristeći VPR routing semantiku.
+    Pronalazi SOURCE čvor i gradi stablo pomoću _build_vpr_tree_sequential.
+
+_build_vpr_tree_sequential(self)
+    Build tree from VPR route file sequential format.
+    Parsira segmente sekvencijalno, detektuje branch point-e.
+
+_find_node_in_tree(self, root, node_id) -> Optional[RouteSegment]
+    Recursively find a node with given ID in the tree.
+    DFS pretraga kroz stablo.
+
+_find_appropriate_parent_for_next_segment(self, next_index) -> RouteSegment
+    Find the appropriate parent for the next segment in sequence.
+    Koristi se pri građenju stabla.
+
+_find_routing_connection_point(self, target_seg) -> Optional[RouteSegment]
+    Find a node in the tree that could logically connect to target segment.
+    Pomoćna funkcija za povezivanje segmenata.
+
+_build_tree_recursive(self, current_node, node_map, visited)
+    Rekurzivno gradi stablo na osnovu routing logike.
+
+_find_next_nodes(self, current, node_map, visited) -> List[RouteSegment]
+    Pronalazi sledeće čvorove u routing sekvenci.
+    Implementira VPR routing pravila.
+
+_is_adjacent_or_same(self, node1, node2) -> bool
+    Proverava da li su čvorovi susedni ili na istoj lokaciji.
+    Manhattan distance <= 1.
+
+_is_routing_continuation(self, current, next_node) -> bool
+    Proverava da li je next_node logičko produženje routing putanje.
+    Proverava CHANX/CHANY pravila.
+
+get_all_source_to_sink_paths(self) -> List[List[RouteSegment]]
+    Vraća sve putanje od SOURCE do svih SINK-ova.
+    Poziva root.get_all_paths_to_leaves().
+
+get_path_coordinates(self) -> List[List[tuple]]
+    Vraća koordinate svih putanja (za vizuelizaciju).
+    Ekstrahuje (x,y) koordinate iz svih putanja.
+
+to_dict(self, include_tree=True) -> Dict
+    Serijalizacija sa tree strukturom.
+    Opciono uključuje tree i paths.
+
+------------------------------------------------------------------------
+Klasa: RoutingResult
+Opis: Agregator routing rezultata za sve net-ove
+
+Atributi:
+    routes: Lista NetRoute objekata
+    congestion: Mapa zagušenja
+    metadata: Dodatni metapodaci
+    circuit: Referenca na Circuit
+    architecture: Referenca na FPGAArchitecture
+    successful: Da li je routing uspešan
+    total_wire_length: Ukupna dužina žica
+    iteration_count: Broj iteracija
+    timing_data: Podaci o timingu-u
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+calculate_congestion_metrics(self) -> Dict[str, float]
+    Računa različite metrike zagušenja.
+    Vraća max, avg, min, broj zagušenih segmenata.
+
+get_high_congestion_segments(self, threshold=0.8) -> List[str]
+    Vraća segmente sa visokim zagušenjem.
+    Filtrira segmente iznad thresholda.
+
+to_dict(self) -> Dict
+    Serijalizacija u dictionary.
+
+get_route_statistics(self) -> Dict[str, Any]
+    Statistika routing stabala.
+    Računa broj net-ova sa grananjima, max fanout, avg path length.
+
+
+================================================================================
+5. FAJL: models/fpga_architecture.py
+================================================================================
+
+OPIS:
+Model klase za reprezentaciju FPGA arhitekture.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: Point
+Opis: Represents a 2D point with x,y coordinates
+
+Atributi:
+    x: X koordinata
+    y: Y koordinata
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__eq__(self, other)
+    Operator jednakosti za poređenje tačaka.
+
+__hash__(self)
+    Hash funkcija za korišćenje u set-ovima i dict-ovima.
+
+to_dict(self) -> Dict[str, int]
+    Konverzija u dictionary.
+
+------------------------------------------------------------------------
+Klasa: BoundingBox
+Opis: Represents a rectangular region defined by two points
+
+Atributi:
+    min_point: Donji levi ugao (Point)
+    max_point: Gornji desni ugao (Point)
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+@property width(self) -> int
+    Širina bounding box-a.
+    Izračunava kao max_x - min_x + 1.
+
+@property height(self) -> int
+    Visina bounding box-a.
+    Izračunava kao max_y - min_y + 1.
+
+contains_point(self, point: Point) -> bool
+    Da li bounding box sadrži tačku.
+    Proverava da li su koordinate unutar granica.
+
+intersects(self, other: BoundingBox) -> bool
+    Da li se dva bounding box-a preklapaju.
+    Proverava da li postoji preklapanje u oba pravca.
+
+to_dict(self) -> Dict
+    Konverzija u dictionary.
+
+------------------------------------------------------------------------
+Klasa: LogicBlock
+Opis: Logički blok FPGA čipa (CLB, IO, itd.)
+
+Atributi:
+    type: Tip bloka (CLB, IO)
+    x, y: Pozicija na grid-u
+    inputs: Broj ulaza
+    outputs: Broj izlaza
+    name: Ime bloka
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+to_dict(self) -> Dict[str, Any]
+    Konverzija u dictionary.
+    Vraća kopiju __dict__.
+
+------------------------------------------------------------------------
+Klasa: RoutingChannel
+Opis: Routing kanal između blokova
+
+Atributi:
+    segment_id: ID segmenta
+    direction: Smer kanala (horizontal/vertical)
+    length: Dužina kanala
+    capacity: Kapacitet (broj track-ova)
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+to_dict(self) -> Dict[str, Any]
+    Konverzija u dictionary.
+    Vraća kopiju __dict__.
+
+------------------------------------------------------------------------
+Klasa: FPGAArchitecture
+Opis: Kompletan model FPGA arhitekture
+
+Atributi:
+    name: Ime arhitekture
+    width: Širina grid-a
+    height: Visina grid-a
+    logic_blocks: Lista LogicBlock objekata
+    routing_channels: Lista RoutingChannel objekata
+    parameters: Dictionary parametara
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+to_dict(self) -> Dict[str, Any]
+    Konverzija u dictionary.
+    Konvertuje sve pod-objekte rekurzivno.
+
+
+================================================================================
+6. FAJL: parsers/architecture_parser.py
+================================================================================
+
+OPIS:
+Parser za VTR RRG (Routing Resource Graph) XML fajlove.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: ArchitectureParser
+Opis: Parser za VTR RRG (Routing Resource Graph) XML fajlove
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self)
+    Inicijalizuje parser sa namespace-om za XML.
+
+parse_architecture(self, file_path: str) -> FPGAArchitecture
+    Parsira FPGA arhitekturu iz RRG XML fajla.
+    Učitava XML, parsira ga i vraća FPGAArchitecture objekat.
+
+parse(self, file_path: str) -> FPGAArchitecture
+    Alias za kompatibilnost — poziva parse_architecture.
+
+parse_xml(self, file_path: str) -> FPGAArchitecture
+    Alias za kompatibilnost — poziva parse_architecture.
+
+_parse_rrg_document(self, root: ET.Element) -> FPGAArchitecture
+    Parsira celokupan RRG XML dokument.
+    Ekstrahuje block_types, channels, grid lokacije i parametre.
+
+_parse_grid_width(self, root: ET.Element) -> int
+    Određuje širinu grid-a iz channels sekcije.
+    Broji broj x_list elemenata.
+
+_parse_grid_height(self, root: ET.Element) -> int
+    Određuje visinu grid-a iz channels sekcije.
+    Broji broj y_list elemenata.
+
+_parse_block_types(self, root: ET.Element) -> List[LogicBlock]
+    Parsira block_types iz RRG XML-a.
+    Ekstrahuje tipove blokova sa input/output pinovima.
+
+_parse_channels(self, root: ET.Element) -> List[RoutingChannel]
+    Parsira routing channels iz RRG XML-a.
+    Kreira horizontalne i vertikalne kanale za grid.
+
+_parse_grid_locations(self, root, architecture)
+    Parsira grid lokacije i ažurira pozicije logic blocks.
+    Postavlja X,Y koordinate blokovima.
+
+_parse_rrg_parameters(self, root: ET.Element) -> Dict[str, str]
+    Parsira parametre iz RRG fajla.
+    Ekstrahuje tool_name, tool_version, channel info, switch count, itd.
+
+parse_simple_architecture(self, width: int, height: int) -> FPGAArchitecture
+    Kreira jednostavnu FPGA arhitekturu za testiranje.
+    Generiše grid sa IO blokovima na ivicama i CLB blokovima u sredini.
+    Preskaće uglove grid-a.
+
+
+================================================================================
+7. FAJL: parsers/circuit_parser.py
+================================================================================
+
+OPIS:
+Parser za Verilog i BLIF fajlove.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: CircuitParser
+Opis: Parser za Verilog i BLIF fajlove
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self)
+    Inicijalizuje parser sa regex pattern-ima za Verilog.
+    Definiše wire_pattern, assign_pattern, module_pattern.
+
+parse_verilog(self, file_path: str) -> Circuit
+    Parsira Verilog fajl.
+    Ekstrahuje module name, wire deklaracije, assign statement-e,
+    i module instance-e.
+
+parse_blif(self, file_path: str) -> Circuit
+    Parsira BLIF fajl.
+    Ekstrahuje .inputs, .outputs, .names statement-e.
+
+_parse_verilog_line(self, line: str, circuit: Circuit)
+    Parsira jednu liniju Verilog koda.
+    Detektuje wire, assign, ili module instance statement-e.
+
+_parse_blif_line(self, line: str, circuit: Circuit)
+    Parsira jednu liniju BLIF fajla.
+    Detektuje .inputs, .outputs, ili .names statement-e.
+
+_parse_connections(self, connections_str: str, component: Component)
+    Parsira konekcije u Verilog modulu.
+    Ekstrahuje input/output portove iz connection string-a.
+
+_remove_comments(self, content: str) -> str
+    Uklanja komentare iz Verilog koda.
+    Uklanja // i /* */ komentare.
+
+_extract_circuit_name(self, file_path: str) -> str
+    Ekstraktuje ime kola iz putanje fajla.
+    Koristi basename bez ekstenzije.
+
+create_test_circuit(self, num_signals: int = 10) -> Circuit
+    Kreira test kolo za demonstraciju.
+    Generiše nasumične signale sa rutama.
+
+_generate_simple_route(self, signal: Signal)
+    Generiše jednostavnu rutu između source i destination.
+    Koristi Manhattan routing (prvo horizontalno, zatim vertikalno).
+
+
+================================================================================
+8. FAJL: parsers/routing_parser.py
+================================================================================
+
+OPIS:
+Parser za VTR routing fajlove (.route) i RRG fajlove.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: RoutingParser
+Opis: Parser za VTR routing fajlove (.route) i RRG fajlove
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self)
+    Inicijalizuje parser sa regex pattern-ima.
+    Definiše net_pattern i route_segment_pattern.
+
+parse_routing_file(self, filepath, architecture, circuit=None) -> RoutingResult
+    Parse VPR .route file sa formatom:
+    Net 0 (c0)
+    Node: 547 SOURCE (4,0,0) Pad: 7 Switch: 0
+    
+    Parsira net-ove liniju po liniju, gradi routing stabla,
+    i računa congestion metriku.
+
+_parse_node_line(self, line: str, line_num: int) -> Optional[RouteSegment]
+    Parse liniju oblika: Node: 547 SOURCE (4,0,0) Pad: 7 Switch: 0
+    Ekstrahuje node_id, node_type, koordinate, track, switch_id, i dodatne atribute.
+
+_parse_placement_info(self, content: str, routing_result: RoutingResult)
+    Parsira informacije o placement-u iz header-a.
+    Ekstrahuje dimenzije array-a.
+
+_parse_net_routes(self, content: str, circuit: Circuit)
+    Parsira rute za svaki net u .route fajlu.
+    Gradi rute kroz čvorove.
+
+_process_net_route(self, net_info: tuple, route_nodes: List[Dict], circuit: Circuit)
+    Procesuira rutu jednog net-a i kreira odgovarajući signal.
+    Postavlja source, destination, route points, i metapodatke.
+
+_analyze_route_congestion(self, content: str, architecture: FPGAArchitecture) -> Dict
+    Analizira zagušenje na osnovu parsiranih ruta.
+    Broji koliko puta je svaki CHANX/CHANY segment korišćen.
+
+_parse_timing_info(self, content: str, routing_result: RoutingResult)
+    Parsira informacije o vremenu izvršavanja ako su dostupne.
+    Ekstrahuje routing time iz komentara.
+
+parse_rrg_file(self, file_path: str, architecture, circuit) -> RoutingResult
+    Parsira VTR RRG fajl za routing resurse.
+    Parsira rr_nodes i rr_edges iz XML strukture.
+
+_parse_rr_nodes(self, root: ET.Element, circuit: Circuit)
+    Parsira rr_nodes sekciju iz RRG fajla.
+    Kreira signale za SOURCE, OPIN, SINK, IPIN čvorove.
+
+_parse_rr_edges(self, root: ET.Element, circuit: Circuit)
+    Parsira rr_edges sekciju za konekcije između čvorova.
+    Povezuje signale na osnovu edge-ova.
+
+_analyze_rrg_congestion(self, root, architecture) -> Dict[str, float]
+    Analizira zagušenje na osnovu RRG čvorova.
+    Broji čvorove po lokacijama.
+
+parse_simple_routing(self, architecture, circuit) -> RoutingResult
+    Generiše jednostavne routing rezultate za testiranje.
+    Kreira nasumične congestion podatke.
+
+export_routing_summary(self, result: RoutingResult, output_path: str)
+    Export routing results summary to JSON.
+    Čuva osnovne statistike u JSON fajl.
+
+_calculate_tree_statistics(self, routes) -> Dict[str, Any]
+    Računa statistiku routing stabala.
+    Broji branch-ove, fanout, path length.
+
+export_routing_trees(self, result: RoutingResult, output_path: str)
+    Export routing trees to JSON for visualization.
+    Čuva kompletna stabla u JSON format.
+
+
+================================================================================
+9. FAJL: visualization/signal_visualizer.py
+================================================================================
+
+OPIS:
+VPR-style routing visualization. Crta FPGA grid sa blokovima, track-ovima,
+i routing putanjama.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: SignalVisualizer
+Opis: VPR-style routing visualization
+
+Atributi:
+    TILE_SIZE: Veličina tile-a u pikselima (100)
+    CLB_SIZE: Veličina CLB bloka (50)
+    IO_SIZE: Veličina IO bloka (45)
+    TRACK_COUNT: Broj track-ova po kanalu (8)
+    ROUTE_COLORS: Lista boja za signale
+    NODE_COLORS: Dictionary boja po tipu čvora (SOURCE, SINK, CHANX, CHANY)
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self)
+    Inicijalizuje visualizer sa podešavanjima iz settings.
+
+visualize_routing(self, architecture, routing, output_path, ...)
+    Glavna metoda za vizualizaciju routing-a.
+    Prima arhitekturu, routing rezultate, i razne opcije prikaza.
+    Generiše PNG sliku sa grid-om, blokovima, track-ovima i rutama.
+    
+    Parametri:
+    - show_grid: Prikaži grid linije
+    - show_segment_ids: Prikaži ID-jeve segmenata
+    - show_legend: Prikaži legendu
+    - show_signals: Prikaži signale
+    - show_bounding_boxes: Prikaži bounding boxove
+    - show_signal_labels: Prikaži labele signala
+    - show_directions: Prikaži strelice pravca
+    - show_heatmap: Prikaži heat mapu
+
+_calculate_block_hpwl_coverage(self, routing, width, height) -> Dict
+    Računa prosečnu HPWL vrednost za svaki blok na osnovu bounding boxova.
+    Koristi se za heat mapu koja pokazuje koja područja grid-a imaju najveću 
+    routing kompleksnost.
+
+_get_heatmap_color(self, value, min_val, max_val) -> str
+    Izračunava boju na gradientu od žute (najmanja vrednost) 
+    preko narandžaste do crvene (najveća vrednost).
+
+io_center(self, gx, gy) -> Tuple[float, float]
+    Alias za _get_io_position() - za kompatibilnost.
+    Vraća centar IO bloka.
+
+clb_center(self, x, y)
+    CLB/IO block center - vraća centar tile-a u pikselima.
+
+chanx_y_for_track(self, row, track)
+    Y koordinata horizontalnog track-a - matching track drawing exactly.
+    Računa preciznu poziciju track-a u horizontalnom gap-u.
+
+chany_x_for_track(self, col, track)
+    X koordinata vertikalnog track-a - matching track drawing exactly.
+    Računa preciznu poziciju track-a u vertikalnom gap-u.
+
+_draw_background_grid(self, width, height)
+    Crta pozadinsku mrežu grid linija.
+
+_draw_blocks(self, width, height, block_hpwl_stats=None)
+    Draw blocks based on standard FPGA layout.
+    IO blokovi na ivicama (excluding corners), CLB u unutrašnjosti.
+    Ako postoje HPWL statistike, primenjuje heat map boje.
+
+_draw_clb_block_at_grid(self, grid_x, grid_y, avg_hpwl=None, ...)
+    Draw a CLB block at grid position (grid_x, grid_y).
+    Opciono prikazuje prosečnu HPWL vrednost umesto "CLB" labele.
+
+_draw_io_block_at_grid(self, grid_x, grid_y, avg_hpwl=None, ...)
+    Draw an IO block at grid position (grid_x, grid_y).
+    Opciono prikazuje prosečnu HPWL vrednost umesto "IO" labele.
+
+_draw_tracks(self, width, height)
+    Crta routing kanale (CHANX i CHANY) između blokova.
+    Crta kratke track linije u svakom gap-u.
+    Preskače track-ove između IO blokova.
+    Crta switch blokove (SB) - beli kvadrati na presecima.
+
+_draw_routes(self, routing, architecture, show_segment_ids, show_directions, show_signal_labels)
+    Iterira kroz rute i crta putanje.
+    Detektuje da li postoji tree struktura ili flat lista segmenata.
+
+_draw_vpr_path(self, segments, base_color, show_directions, route_label="")
+    Draw VPR routing path sa connecting linijama između CHANX/CHANY segmenata.
+    Crta CHANX kao horizontalne linije, CHANY kao vertikalne linije.
+    Crta SOURCE kao crveni kvadrat, SINK kao zeleni trougao.
+    Opciono dodaje strelice pravca.
+    Dodaje labele signala na SOURCE markere.
+
+_is_valid_position(self, x, y) -> bool
+    Check if position is within valid grid bounds.
+
+_build_manhattan_path(self, segments) -> List[Dict]
+    Pretvara segment listu u Manhattan putanju koja prati grid.
+    Implementira VPR routing pravila za povezivanje čvorova.
+
+_draw_segment_group(self, seg_group, base_color, show_directions)
+    Crta jedan logički segment (može biti linija ili L-shape).
+
+_get_node_position(self, seg: RouteSegment) -> Tuple[float, float]
+    Vraća (x, y) poziciju čvora u pikselima.
+    Različito za SOURCE/SINK, OPIN/IPIN, CHANX, CHANY.
+
+_get_io_position(self, gx, gy) -> Tuple[float, float]
+    Vraća poziciju IO bloka na osnovu koordinata iz layout-a.
+
+_is_io_block(self, gx, gy) -> bool
+    Detektuje da li je (gx, gy) pozicija IO bloka.
+    Proverava da li je pozicija na ivici grid-a.
+
+_draw_signal_direction_arrow(self, segments, current_index, start_x, start_y, end_x, end_y, color, seg_type)
+    Crta strelicu u sredini segmenta na osnovu smera ka sledećem segmentu.
+    Određuje smer analizom sledećeg segmenta u putanji.
+
+_connects_to_start(self, current_seg, next_seg, seg_type)
+    Određuje smer strelice na osnovu analize stvarnih slučajeva.
+    Implementira kompleksna pravila za CHANX/CHANY transitions.
+
+_draw_direction_arrow(self, x1, y1, x2, y2, color, node_type)
+    Crta strelicu u sredini žice koja pokazuje smer.
+    Normalizuje vektor i crta matplotlib arrow.
+
+_extract_all_paths(self, root_node) -> List[List[RouteSegment]]
+    Ekstraktuje sve putanje od ROOT do SINK čvorova (tree traversal).
+    DFS rekurzivna traversal kroz routing stablo.
+
+_draw_bounding_boxes_heatmap(self, routing)
+    Crta crne bounding boxove sa malom alpha vrednošću za heat mapu.
+    Preklapanja se vide kao tamnija siva područja.
+
+_draw_bounding_boxes(self, routing, show_labels=False)
+    Crta bounding box (HPWL) za svaki signal.
+    HPWL = (max_x - min_x + 1) + (max_y - min_y + 1).
+    Opciono prikazuje HPWL vrednost i ime signala.
+
+_draw_legend(self, routing)
+    Legenda sa SOURCE/SINK markerima u bojama signala.
+    Prikazuje prvih 8 signala.
+
+_add_title_and_subtitle(self, show_heatmap, show_signals, show_bounding_boxes, architecture_file, routing_file, filter_type, filter_value)
+    Dodaje naslov i podnaslov na osnovu prikazanih opcija i filtera.
+    Gornji levi ćošak: nazivi fajlova.
+    Donji deo: filter informacije.
+
+_save(self, path, dpi)
+    Čuva figuru u PNG format i zatvara matplotlib figure.
+
+
+================================================================================
+10. FAJL: analysis/conflict_graph.py
+================================================================================
+
+OPIS:
+Klasa za građenje i analizu konflikt grafa između signala.
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: ConflictGraphBuilder
+Opis: Klasa za građenje i analizu konflikt grafa
+
+Atributi:
+    conflict_graph: NetworkX Graph objekat
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self)
+    Inicijalizuje prazan konflikt graf.
+
+build_conflict_graph(self, data) -> nx.Graph
+    Građi konflikt graf za dato kolo ili routing.
+    Detektuje tip podataka i poziva odgovarajuću metodu.
+
+_build_from_circuit(self, circuit: Circuit) -> nx.Graph
+    Građi konflikt graf iz Circuit objekta (legacy).
+    Dodaje signale kao čvorove i detektuje konflikte.
+
+_build_from_routing(self, routing: RoutingResult) -> nx.Graph
+    Građi konflikt graf iz Routing objekta.
+    Dodaje net-ove kao čvorove i detektuje konflikte.
+
+_detect_bounding_box_conflicts_circuit(self, circuit)
+    Detektuje konflikte bazirane na preklapanju bounding box-ova (Circuit).
+    Proverava da li se bounding boxovi signala preklapaju.
+
+_detect_bounding_box_conflicts_routing(self, routing)
+    Detektuje konflikte bazirane na preklapanju bounding box-ova (Routing).
+    Računa bounding boxove za route-ove i proverava preklapanje.
+
+_calculate_route_bounding_box(self, route: NetRoute) -> Dict[str, int]
+    Izračunava bounding box za NetRoute.
+    Pronalazi min/max X i Y koordinate.
+
+_bboxes_overlap(self, bbox1, bbox2) -> bool
+    Proverava da li se dva bounding box-a preklapaju.
+    Koristi rectangle intersection logiku.
+
+_detect_routing_conflicts_circuit(self, circuit)
+    Detektuje konflikte bazirane na deljenju routing resursa (Circuit).
+    Grupiše signale po segmentima koje koriste.
+
+_detect_routing_conflicts_routing(self, routing)
+    Detektuje konflikte bazirane na deljenju routing resursa (Routing).
+    Grupiše net-ove po segmentima koje dele.
+
+identify_hubs(self, centrality_threshold=0.1) -> List[str]
+    Identifikuje habove u konflikt grafu.
+    Računa betweenness centrality i pronalazi high-centrality čvorove.
+
+get_connected_components(self) -> List[Set[str]]
+    Vraća povezane komponente konflikt grafa.
+    Koristi NetworkX connected_components.
+
+calculate_graph_metrics(self) -> Dict[str, float]
+    Računa metriku konflikt grafa.
+    Vraća num_nodes, num_edges, density, avg_degree, 
+    clustering_coefficient, connected_components.
+
+visualize_conflict_graph(self, highlight_hubs=True) -> plt.Figure
+    Vizuelizuje konflikt graf.
+    Crta graf sa spring layout-om.
+    Habovi su označeni crvenom bojom.
+    Dodaje legendu i metrike kao text box.
+
+get_conflicts_for_signal(self, signal_name: str) -> List[str]
+    Vraća signale u konfliktu sa datim signalom.
+    Vraća sve susede u grafu.
+
+export_to_gml(self, filename: str)
+    Izvozi konflikt graf u GML format.
+    Koristi NetworkX write_gml.
+
+
+================================================================================
+11. FAJL: analysis/advanced_analyzer.py
+================================================================================
+
+OPIS:
+Advanced Analyzer za FPGA_Visualizer. Prikuplja napredne analize
+nad grafom, signalima i routing podacima koristeći numpy, networkx, 
+i scikit-learn (KMeans).
+
+KLASE:
+------------------------------------------------------------------------
+Klasa: SubgraphNSAnalysisResult (dataclass)
+Opis: Rezultat n-SB analize podgrafa
+
+Atributi:
+    n: Broj hop-ova
+    subgraphs_count: Broj podgrafova
+    sizes: Liste veličina podgrafova
+    densitites: Liste gustina podgrafova
+    top_subgraphs: Top K podgrafova
+
+------------------------------------------------------------------------
+Klasa: EndpointOffsetResult (dataclass)
+Opis: Rezultat analize ofseta krajnjih tačaka
+
+Atributi:
+    avg_offset: Prosečan ofset
+    max_offset: Maksimalan ofset
+    offsets: Lista svih ofseta
+    per_signal: Dictionary ofseta po signalu
+
+------------------------------------------------------------------------
+Klasa: CongestionEvolutionResult (dataclass)
+Opis: Rezultat analize evolucije zagušenja
+
+Atributi:
+    iterations: Broj iteracija
+    mean_per_iter: Prosečno zagušenje po iteraciji
+    trend_slope: Nagib trenda
+    trend_intercept: Presek trenda
+
+------------------------------------------------------------------------
+Klasa: SignalClusterResult (dataclass)
+Opis: Rezultat klaster analize signala
+
+Atributi:
+    n_clusters: Broj klastera
+    labels: Labele klastera za svaki signal
+    centroids: Centroidi klastera
+
+------------------------------------------------------------------------
+Klasa: RoutingComplexityResult (dataclass)
+Opis: Rezultat analize kompleksnosti rutiranja
+
+Atributi:
+    avg_degree: Prosečan stepen grafa
+    avg_path_length: Prosečna dužina putanje
+    path_length_std: Standardna devijacija dužine putanje
+    congestion_entropy: Entropija zagušenja
+
+------------------------------------------------------------------------
+Klasa: OptimizationRecommendation (dataclass)
+Opis: Preporuka za optimizaciju
+
+Atributi:
+    priority: Prioritet (HIGH, MEDIUM, LOW)
+    message: Poruka preporuke
+    details: Dodatni detalji
+
+------------------------------------------------------------------------
+Klasa: AdvancedAnalysisReport (dataclass)
+Opis: Kompletan izveštaj napredne analize
+
+Atributi:
+    subgraph_ns: SubgraphNSAnalysisResult
+    endpoint_offsets: EndpointOffsetResult
+    congestion_evolution: CongestionEvolutionResult
+    signal_clusters: SignalClusterResult
+    routing_complexity: RoutingComplexityResult
+    recommendations: Lista OptimizationRecommendation
+
+------------------------------------------------------------------------
+Klasa: AdvancedAnalyzer
+Opis: Napredni analitičar za FPGA vizualizacije
+
+METODE/FUNKCIJE:
+------------------------------------------------------------------------
+
+__init__(self, graph, signals, routing_data=None)
+    Inicijalizuje analyzer sa grafom, signalima i routing podacima.
+
+@staticmethod _safe_get_path_length(signal: Dict) -> float
+    Helper: ekstrahuje dužinu puta iz signala.
+    Koristi wire_length ili len(path)-1.
+
+@staticmethod _euclidean_distance(a, b) -> float
+    Helper: računa Euklidsko rastojanje između dve tačke.
+
+subgraph_ns_analysis(self, n=2, top_k=5) -> SubgraphNSAnalysisResult
+    n-SB analiza podgrafa — pronalazi i rangira podgrafe oko signala.
+    Za svaki signal uzima n-hop okolinu.
+    Meri veličinu i gustinu podgrafova.
+    Vraća top K po veličini.
+
+endpoint_offset_analysis(self, coordinate_attr="pos") -> EndpointOffsetResult
+    Analiza ofseta krajnjih tačaka.
+    Za svaki signal meri udaljenost između endpointa i node pozicija.
+    Računa prosečan i maksimalan ofset.
+
+congestion_evolution(self, congestion_history=None) -> CongestionEvolutionResult
+    Analiza evolucije zagušenja kroz iteracije.
+    Prima listu congestion grid-ova ili metrika.
+    Računa linearni trend (slope, intercept).
+
+signal_cluster_analysis(self, n_clusters=4, features=None, random_state=0) -> SignalClusterResult
+    Klaster analiza signala koristeći KMeans.
+    Ekstrahuje feature-e: wire_length, path_len, avg_edge_cong, endpoint_degree.
+    Normalizuje feature-e i primenjuje KMeans clustering.
+    Vraća label-e i centroids.
+
+routing_complexity(self) -> RoutingComplexityResult
+    Analiza kompleksnosti rutiranja.
+    Računa: prosečan stepen grafa, prosečna dužina puteva,
+    standardna devijacija, entropija zagušenja.
+
+generate_optimization_recommendations(self, report=None) -> List[OptimizationRecommendation]
+    Na osnovu izvršenih analiza daje preporuke.
+    Heuristička logika:
+    - Ako trend zagušenja raste -> HIGH priority re-routing
+    - Ako avg_offset velika -> VALIDATE placement
+    - Ako postoje veliki klasteri -> regrouping
+    - Ako entropy zagušenja velika -> redistribucija
+
+run_all(self, n_subgraph=2, n_clusters=4) -> AdvancedAnalysisReport
+    Pokreše sve glavne analize i skupi izveštaj.
+    Poziva sve metode analize i generiše kompletan report.
+
+
+================================================================================
+KRAJ DOKUMENTA
+================================================================================
+
+Ova analiza pokriva sve Python fajlove u FPGA_Visualizer projektu.
+Za svaki fajl su navedene:
+- Sve klase
+- Sve metode/funkcije sa kratkim opisima šta rade
+- Korišćeni docstringovi i komentari iz koda
+
+Datum kreiranja: 13. novembar 2025
+================================================================================
