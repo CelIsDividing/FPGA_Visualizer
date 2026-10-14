@@ -9,6 +9,8 @@ import sys
 import re
 import json
 import time
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from flask_cors import CORS
 from typing import Dict, List, Optional
