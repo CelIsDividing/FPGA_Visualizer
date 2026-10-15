@@ -590,6 +590,62 @@ class FPGAVisualizationApp:
             except Exception as e:
                 return jsonify({'error': str(e)}), 400
         
+        @self.app.route('/demo/load', methods=['POST'])
+        def load_demo_files():
+            """Loads the bundled demo files (rrg.xml and b9.route)"""
+            global cached_routing, cached_architecture, cached_architecture_filename, cached_routing_filename
+            try:
+                demo_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'demo_files')
+                arch_path = os.path.join(demo_dir, 'rrg.xml')
+                route_path = os.path.join(demo_dir, 'b9.route')
+
+                if not os.path.exists(arch_path) or not os.path.exists(route_path):
+                    return jsonify({'success': False, 'error': 'Demo files not found'}), 404
+
+                # Load and parse the demo architecture
+                architecture = self.architecture_parser.parse(arch_path)
+                self.current_architecture = architecture
+                self.architecture_filename = 'rrg.xml'
+                cached_architecture = architecture
+                cached_architecture_filename = 'rrg.xml'
+
+                # Load and parse the demo routing
+                routing_result = self.routing_parser.parse_routing_file(
+                    route_path,
+                    architecture,
+                    self.current_circuit
+                )
+                self.current_routing = routing_result
+                self.routing_filename = 'b9.route'
+                cached_routing = routing_result
+                cached_routing_filename = 'b9.route'
+
+                # Extract signals (same shape as /api/parse_routing)
+                signals = []
+                for route in routing_result.routes:
+                    signals.append({
+                        'net_name': route.net_name,
+                        'segment_count': len(route.segments),
+                        'fanout': len(route.get_all_source_to_sink_paths()) if route.root else 1
+                    })
+
+                return jsonify({
+                    'success': True,
+                    'signals': signals,
+                    'total_nets': len(signals),
+                    'architecture_filename': 'rrg.xml',
+                    'routing_filename': 'b9.route',
+                    'architecture': {
+                        'width': architecture.width,
+                        'height': architecture.height
+                    }
+                })
+
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return jsonify({'success': False, 'error': str(e)}), 500
+
         @self.app.route('/download/<path:filename>')
         def download_file(filename):
             """Route for downloading generated files"""

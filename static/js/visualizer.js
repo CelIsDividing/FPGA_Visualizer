@@ -30,6 +30,9 @@ class FPGAVisualizer {
         this.bindFileInput('circuitFile', () => this.onCircuitFileSelected());
         this.bindFileInput('routingFile', () => this.onRoutingFileSelected());
 
+        // Bind the demo files button
+        this.bindButton('#loadDemoBtn', () => this.loadDemoFiles());
+
         this.bindButton('#selectAllSignals', () => this.selectAllSignals());
         this.bindButton('#deselectAllSignals', () => this.deselectAllSignals());
         
@@ -133,6 +136,47 @@ class FPGAVisualizer {
 
         } catch (error) {
             console.error('Error loading routing file:', error);
+            this.showMessage(`Error: ${error.message}`, 'error');
+        } finally {
+            this.uploadInProgress = false;
+        }
+    }
+
+    async loadDemoFiles() {
+        if (this.uploadInProgress) {
+            this.showMessage('Upload in progress, please wait...', 'info');
+            return;
+        }
+
+        this.uploadInProgress = true;
+        this.showMessage('Loading demo files (rrg.xml, b9.route)...', 'info');
+
+        try {
+            const response = await fetch('/demo/load', {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+
+            this.loadedSignals = data.signals || [];
+            this.populateSignalsList(this.loadedSignals);
+
+            // Add to history
+            this.addToArchitectureHistory(data.architecture_filename || 'rrg.xml');
+            this.addToRoutingHistory(data.routing_filename || 'b9.route');
+
+            // Set currentRouting and currentArchitecture as "loaded"
+            // (required for the "Analyze Conflicts" button)
+            this.currentRouting = { loaded: true };
+            this.currentArchitecture = { loaded: true };
+
+            this.showMessage(`Demo loaded: ${this.loadedSignals.length} signals`, 'success');
+        } catch (error) {
+            console.error('Error loading demo files:', error);
             this.showMessage(`Error: ${error.message}`, 'error');
         } finally {
             this.uploadInProgress = false;
