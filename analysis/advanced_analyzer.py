@@ -1,20 +1,20 @@
 """
-Advanced Analyzer za FPGA_Visualizer
+Advanced Analyzer for FPGA_Visualizer
 ===================================
 
-Ovaj modul sadržI klasu `AdvancedAnalyzer` koja prikuplja napredne analize
-nad grafom, signalima i routing podacima.
+This module contains the `AdvancedAnalyzer` class that collects advanced analyses
+over the graph, signals and routing data.
 
-Pretpostavke o inputima (fleksibilne):
-- `graph` je networkx Graph/DiGraph gde node-ovi mogu imati atribute (npr. pos, tile)
-- `signals` je lista dict-ova ili objekata sa bar poljima: `name`, `endpoints`, `path`, `wire_length`
-  * `endpoints`: list/tuple od 2 node id-a (source, sink) ili lista tačaka
-  * `path`: lista node id-ova koja opisuje rutu (može biti prazno ako nije dostupno)
-  * `wire_length`: numerička vrednost (ako postoji)
-- `routing_data` je dict sa dodatnim informacijama npr. `edge_congestion` mapa (edge -> value)
+Assumptions about inputs (flexible):
+- `graph` is a networkx Graph/DiGraph where nodes can have attributes (e.g. pos, tile)
+- `signals` is a list of dicts or objects with at least the fields: `name`, `endpoints`, `path`, `wire_length`
+  * `endpoints`: list/tuple of 2 node ids (source, sink) or a list of points
+  * `path`: list of node ids describing the route (can be empty if not available)
+  * `wire_length`: numeric value (if present)
+- `routing_data` is a dict with additional information e.g. `edge_congestion` map (edge -> value)
 
-Zahtevi zavise od biblioteka: koristi se numpy, networkx, scikit-learn (KMeans).
-Ako nisu u projektu - dodati u requirements.txt: numpy, networkx, scikit-learn
+Requirements depend on libraries: numpy, networkx, scikit-learn (KMeans) are used.
+If they are not in the project - add to requirements.txt: numpy, networkx, scikit-learn
 
 """
 from __future__ import annotations
@@ -93,14 +93,14 @@ class AdvancedAnalysisReport:
 
 
 class AdvancedAnalyzer:
-    """Napredni analitičar za FPGA vizualizacije.
+    """Advanced analyzer for FPGA visualizations.
 
-    Primer upotrebe:
+    Example usage:
 
         analyzer = AdvancedAnalyzer(graph, signals, routing_data)
         report = analyzer.run_all()
 
-    Metode su dizajnirane da budu samostalne i mogu se pozivati pojedinačno.
+    The methods are designed to be standalone and can be called individually.
     """
 
     def __init__(
@@ -131,18 +131,18 @@ class AdvancedAnalyzer:
 
     # -------------------------- analyses --------------------------
     def subgraph_ns_analysis(self, n: int = 2, top_k: int = 5) -> SubgraphNSAnalysisResult:
-        """n-SB analiza podgrafa — pronalazi i rangira podgrafe oko signala.
+        """n-SB subgraph analysis — finds and ranks subgraphs around signals.
 
-        Implementacija:
-        - za svaki signal uzimamo okolinu (n-hop) oko njegovih krajnjih tačaka
-        - spajamo okolne node-ove u lokalni podgraf
-        - merimo veličinu i gustinu
-        - vračamo top K po veličini
+        Implementation:
+        - for each signal we take the neighborhood (n-hop) around its endpoints
+        - we merge the neighboring nodes into a local subgraph
+        - we measure size and density
+        - we return the top K by size
         """
         subgraphs = []
         for sig in self.signals:
             endpoints = sig.get("endpoints") or []
-            # podržimo jedan ili dva endpointa
+            # support one or two endpoints
             nodes_set = set()
             for ep in endpoints[:2]:
                 if ep in self.graph:
@@ -170,11 +170,11 @@ class AdvancedAnalyzer:
         return res
 
     def endpoint_offset_analysis(self, coordinate_attr: str = "pos") -> EndpointOffsetResult:
-        """Analiza ofseta krajnjih tačaka.
+        """Endpoint offset analysis.
 
-        Očekivano: nodes u grafu imaju atribut `coordinate_attr` = (x,y).
-        Za svaki signal uzmemo srednju tačku iz `path` (ili endpoint poziciju ako postoji)
-        i izmerimo udaljenost između endpointa signala i node pozicija.
+        Expected: nodes in the graph have the attribute `coordinate_attr` = (x,y).
+        For each signal we take the midpoint from `path` (or endpoint position if it exists)
+        and measure the distance between the signal's endpoint and node positions.
         """
         offsets = []
         per_signal = {}
@@ -182,10 +182,10 @@ class AdvancedAnalyzer:
         for sig in self.signals:
             name = sig.get("name", "unnamed")
             endpoints = sig.get("endpoints") or []
-            # ako endpoints imaju koordinate direktno
+            # if endpoints have coordinates directly
             local_offsets = []
             for ep in endpoints[:2]:
-                # ep može biti node id ili koordinata tuple
+                # ep can be a node id or a coordinate tuple
                 if isinstance(ep, (list, tuple)) and len(ep) == 2 and not (ep in self.graph):
                     # tuple coords
                     # attempt to match to nearest node
@@ -240,16 +240,16 @@ class AdvancedAnalyzer:
         return res
 
     def congestion_evolution(self, congestion_history: Optional[List[np.ndarray]] = None) -> CongestionEvolutionResult:
-        """Analiza evolucije zagušenja kroz iteracije.
+        """Congestion evolution analysis across iterations.
 
-        `congestion_history` je lista 2D numpy nizova (grid) ili lista 1D lista metrika.
-        Ako nije prosleđeno, pokušava da ga uzme iz routing_data['congestion_history']
+        `congestion_history` is a list of 2D numpy arrays (grid) or a list of 1D metric lists.
+        If not provided, it tries to take it from routing_data['congestion_history']
         """
         if congestion_history is None:
             congestion_history = self.routing_data.get("congestion_history")
 
         if not congestion_history:
-            # fallback: ako routing_data sadrzi edge_congestion per iter
+            # fallback: if routing_data contains edge_congestion per iter
             per_iter = self.routing_data.get("per_iter_mean_congestion")
             if per_iter:
                 mean_per_iter = list(map(float, per_iter))
@@ -276,15 +276,15 @@ class AdvancedAnalyzer:
         return res
 
     def signal_cluster_analysis(self, n_clusters: int = 4, features: Optional[List[str]] = None, random_state: int = 0) -> SignalClusterResult:
-        """Klaster analiza signala koristeći KMeans.
+        """Signal clustering analysis using KMeans.
 
-        Podrazumevane karakteristike se grade iz signala:
-        - wire_length (ako postoji)
+        The default features are built from the signals:
+        - wire_length (if present)
         - path_length (len(path))
-        - avg_edge_congestion na putu (ako routing_data ima edge_congestion map)
-        - degree susedstva (prosečan stepen krajnjih tačaka)
+        - avg_edge_congestion along the path (if routing_data has an edge_congestion map)
+        - neighborhood degree (average degree of the endpoints)
 
-        Vraća label-e i centroids.
+        Returns labels and centroids.
         """
         if features is None:
             features = ["wire_length", "path_len", "avg_edge_cong", "endpoint_degree"]
@@ -356,13 +356,13 @@ class AdvancedAnalyzer:
         return res
 
     def routing_complexity(self) -> RoutingComplexityResult:
-        """Analiza kompleksnosti rutiranja.
+        """Routing complexity analysis.
 
-        Metrike:
-        - prosečan stepen grafa
-        - prosečna dužina puteva (iz signala)
-        - standardna devijacija dužine puteva
-        - entropija zagušenja na ivicama (ako postoji edge_congestion)
+        Metrics:
+        - average graph degree
+        - average path lengths (from signals)
+        - standard deviation of path lengths
+        - edge congestion entropy (if edge_congestion exists)
         """
         degrees = [d for n, d in self.graph.degree()]
         avg_deg = float(np.mean(degrees)) if degrees else 0.0
@@ -396,18 +396,18 @@ class AdvancedAnalyzer:
 
     # -------------------------- recommendations --------------------------
     def generate_optimization_recommendations(self, report: Optional[AdvancedAnalysisReport] = None) -> List[OptimizationRecommendation]:
-        """Na osnovu izvšenih analiza dajemo preporuke.
+        """Based on the performed analyses we give recommendations.
 
-        Logika je heuristička:
-        - ako trend zagušenja raste -> HIGH priority re-routing / binning
-        - ako avg_offset velika -> VALIDATE placement / pin assignment
-        - ako cluster pokazuje "težk" cluster -> spojiti signale / prioritizovati
-        - ako entropy zagušenja velika -> redistribucija
+        The logic is heuristic:
+        - if the congestion trend is rising -> HIGH priority re-routing / binning
+        - if avg_offset is large -> VALIDATE placement / pin assignment
+        - if a cluster shows a "heavy" cluster -> merge signals / prioritize
+        - if congestion entropy is large -> redistribution
         """
         recomms: List[OptimizationRecommendation] = []
 
         if report is None:
-            # pokreni osnovne analize
+            # run the basic analyses
             report = AdvancedAnalysisReport()
             report.congestion_evolution = self.congestion_evolution()
             report.endpoint_offsets = self.endpoint_offset_analysis()
@@ -435,7 +435,7 @@ class AdvancedAnalyzer:
 
         # 2. endpoint offsets
         eo = report.endpoint_offsets
-        if eo and eo.avg_offset > 5.0:  # threshold in "distance units" - prilagoditi
+        if eo and eo.avg_offset > 5.0:  # threshold in "distance units" - adjust
             recomms.append(
                 OptimizationRecommendation(
                     priority="HIGH",
@@ -500,9 +500,9 @@ class AdvancedAnalyzer:
 
     # -------------------------- orchestration --------------------------
     def run_all(self, n_subgraph: int = 2, n_clusters: int = 4) -> AdvancedAnalysisReport:
-        """Pokreši sve glavne analize i skupi izveštaj.
+        """Runs all main analyses and collects a report.
 
-        Ova metoda je korisna za brzinski izvšetak cele analize.
+        This method is useful for a quick execution of the whole analysis.
         """
         report = AdvancedAnalysisReport()
         report.subgraph_ns = self.subgraph_ns_analysis(n=n_subgraph)
@@ -516,7 +516,7 @@ class AdvancedAnalyzer:
 
 # -------------------------- example usage --------------------------
 if __name__ == "__main__":
-    # brzi primer sa sintetičkim podacima
+    # quick example with synthetic data
     G = nx.grid_2d_graph(10, 10)
     # re-label nodes to integers
     G = nx.convert_node_labels_to_integers(G)

@@ -15,23 +15,23 @@ from config.settings import settings
 class SignalVisualizer:
     """
     VPR-style routing visualization:
-    - IPIN (crna tačka) na spoju žice i klastera
-    - OPIN (siva tačka) na spoju klastera i žice
-    - CHANX (plava linija sa strelicom →)
-    - CHANY (crvena linija sa strelicom ↑)
-    - SOURCE (crveni kvadrat)
-    - SINK (zeleni trougao)
-    - SB (tanke linije na presecima)
+    - IPIN (black dot) at the junction of wire and cluster
+    - OPIN (gray dot) at the junction of cluster and wire
+    - CHANX (blue line with arrow →)
+    - CHANY (red line with arrow ↑)
+    - SOURCE (red square)
+    - SINK (green triangle)
+    - SB (thin lines at intersections)
     """
 
-    # Boje po tipu čvora
+    # Colors by node type
     NODE_COLORS = {
-        'SOURCE': '#d62728',    # Crvena
-        'SINK': "#00e400",      # Zelena
-        'OPIN': '#7f7f7f',      # Siva
-        'IPIN': '#000000',      # Crna
-        'CHANX': '#1f77b4',     # Plava
-        'CHANY': '#ff7f0e',     # Narandžasta/crvena
+        'SOURCE': '#d62728',    # Red
+        'SINK': "#00e400",      # Green
+        'OPIN': '#7f7f7f',      # Gray
+        'IPIN': '#000000',      # Black
+        'CHANX': '#1f77b4',     # Blue
+        'CHANY': '#ff7f0e',     # Orange/red
     }
 
     def __init__(self):
@@ -94,7 +94,7 @@ class SignalVisualizer:
         if show_grid:
             self._draw_background_grid(w, h)
 
-        # Izračunaj HPWL statistike za svaki blok ako je heat mapa uključena
+        # Calculate HPWL statistics for each block if the heat map is enabled
         block_hpwl_stats = None
         if show_heatmap and routing:
             block_hpwl_stats = self._calculate_block_hpwl_coverage(routing, w, h)
@@ -102,18 +102,18 @@ class SignalVisualizer:
         self._draw_blocks(w, h, block_hpwl_stats)
         self._draw_tracks(w, h)
         
-        # Prikaži obojene bounding boxove ako je checkbox uključen
+        # Show colored bounding boxes if the checkbox is enabled
         if show_bounding_boxes:
             self._draw_bounding_boxes(routing, show_bounding_box_labels)
         
-        # Prikaži signale (rute i čvorove) samo ako je checkbox uključen
+        # Show signals (routes and nodes) only if the checkbox is enabled
         if show_signals:
             self._draw_routes(routing, architecture, show_segment_ids, show_directions, show_signal_labels)
 
         if show_legend and routing and routing.routes and show_signals:
             self._draw_legend(routing)
         
-        # Dodaj naslov i podnaslov na osnovu opcija
+        # Add title and subtitle based on the options
         self._add_title_and_subtitle(show_heatmap, show_signals, show_bounding_boxes, 
                                      architecture_file, routing_file, filter_type, filter_value)
         
@@ -122,15 +122,15 @@ class SignalVisualizer:
     
     def _calculate_block_hpwl_coverage(self, routing: RoutingResult, width: int, height: int) -> Dict:
         """
-        Računa prosečnu HPWL vrednost za svaki blok na osnovu bounding boxova koji ga pokrivaju
+        Calculates the average HPWL value for each block based on the bounding boxes covering it
         Returns: Dict[(x, y)] = average_hpwl
         """
-        block_hpwl_sums = {}  # (x, y) -> [lista HPWL vrednosti]
+        block_hpwl_sums = {}  # (x, y) -> [list of HPWL values]
         
         nets = getattr(routing, 'routes', getattr(routing, 'nets', []))
         
         for ridx, net in enumerate(nets):
-            # Dobavi segmente
+            # Fetch segments
             segments = []
             if hasattr(net, 'root') and net.root:
                 paths = self._extract_all_paths(net.root)
@@ -146,7 +146,7 @@ class SignalVisualizer:
             if not segments:
                 continue
             
-            # Filtriraj validne koordinate
+            # Filter valid coordinates
             valid_segments = [s for s in segments 
                             if hasattr(s, 'x') and hasattr(s, 'y') 
                             and s.x >= 0 and s.y >= 0]
@@ -154,16 +154,16 @@ class SignalVisualizer:
             if not valid_segments:
                 continue
             
-            # Nađi bounding box koordinate
+            # Find bounding box coordinates
             min_x = min(s.x for s in valid_segments)
             max_x = max(s.x for s in valid_segments)
             min_y = min(s.y for s in valid_segments)
             max_y = max(s.y for s in valid_segments)
             
-            # Izračunaj HPWL
+            # Calculate HPWL
             hpwl = (max_x - min_x + 1) + (max_y - min_y + 1)
             
-            # Za svaki blok koji je pokriven ovim bounding boxom, dodaj HPWL vrednost
+            # For each block covered by this bounding box, add the HPWL value
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
                     if 0 <= x < width and 0 <= y < height:
@@ -171,7 +171,7 @@ class SignalVisualizer:
                             block_hpwl_sums[(x, y)] = []
                         block_hpwl_sums[(x, y)].append(hpwl)
         
-        # Izračunaj prosek za svaki blok
+        # Calculate the average for each block
         block_avg_hpwl = {}
         for (x, y), hpwl_list in block_hpwl_sums.items():
             block_avg_hpwl[(x, y)] = sum(hpwl_list) / len(hpwl_list)
@@ -180,23 +180,23 @@ class SignalVisualizer:
     
     def _get_heatmap_color(self, value: float, min_val: float, max_val: float) -> str:
         """
-        Izračunava boju na gradientu od žute (najmanja vrednost) preko narandžaste do crvene (najveća vrednost)
+        Calculates the color on a gradient from yellow (smallest value) through orange to red (largest value)
         """
         if min_val == max_val:
-            return "#FFA500"  # Narandžasta ako su sve vrednosti iste
+            return "#FFA500"  # Orange if all values are equal
         
-        # Normalizuj vrednost između 0 i 1
+        # Normalize the value between 0 and 1
         normalized = (value - min_val) / (max_val - min_val)
         
-        # Gradijent: žuta (0) -> narandžasta (0.5) -> crvena (1)
+        # Gradient: yellow (0) -> orange (0.5) -> red (1)
         if normalized < 0.5:
-            # Žuta (#FFFF00) -> Narandžasta (#FFA500)
+            # Yellow (#FFFF00) -> Orange (#FFA500)
             t = normalized * 2  # 0 to 1
             r = 255
             g = int(255 - (85 * t))  # 255 -> 170
             b = int(0 + (0 * t))     # 0 -> 0
         else:
-            # Narandžasta (#FFA500) -> Crvena (#FF0000)
+            # Orange (#FFA500) -> Red (#FF0000)
             t = (normalized - 0.5) * 2  # 0 to 1
             r = 255
             g = int(165 - (165 * t))  # 165 -> 0
@@ -206,7 +206,7 @@ class SignalVisualizer:
     
     # ---------- Geometry helpers ----------
     def io_center(self, gx: int, gy: int) -> Tuple[float, float]:
-        """Alias za _get_io_position() - za kompatibilnost"""
+        """Alias for _get_io_position() - for compatibility"""
         return self._get_io_position(gx, gy)
     
     def clb_center(self, x: int, y: int):
@@ -214,7 +214,7 @@ class SignalVisualizer:
         return (x + 0.5) * self.TILE_SIZE, (y + 0.5) * self.TILE_SIZE
 
     def chanx_y_for_track(self, row: int, track: int):
-        """Y koordinata horizontalnog track-a - matching track drawing exactly"""
+        """Y coordinate of the horizontal track - matching track drawing exactly"""
         # Use same calculation as track drawing
         gap_size = self.TILE_SIZE - self.CLB_SIZE
         usable_gap = gap_size * 0.8  # Same 80% as track drawing
@@ -229,7 +229,7 @@ class SignalVisualizer:
         return track_y
     
     def chany_x_for_track(self, col: int, track: int):
-        """X koordinata vertikalnog track-a - matching track drawing exactly"""
+        """X coordinate of the vertical track - matching track drawing exactly"""
         # Use same calculation as track drawing
         gap_size = self.TILE_SIZE - self.CLB_SIZE
         usable_gap = gap_size * 0.8  # Same 80% as track drawing
@@ -261,7 +261,7 @@ class SignalVisualizer:
         # RRG files don't always have complete block information
         corners = {(0, 0), (0, height-1), (width-1, 0), (width-1, height-1)}
         
-        # Nađi minimalnu i maksimalnu HPWL vrednost za gradijent boja
+        # Find the minimum and maximum HPWL values for the color gradient
         min_hpwl = None
         max_hpwl = None
         if block_hpwl_stats:
@@ -277,7 +277,7 @@ class SignalVisualizer:
                     
                 is_edge = (x == 0 or x == width-1 or y == 0 or y == height-1)
                 
-                # Dobavi prosečnu HPWL vrednost za ovaj blok ako postoji
+                # Fetch the average HPWL value for this block if it exists
                 avg_hpwl = None
                 if block_hpwl_stats and (x, y) in block_hpwl_stats:
                     avg_hpwl = block_hpwl_stats[(x, y)]
@@ -291,7 +291,7 @@ class SignalVisualizer:
         """Draw a CLB block at grid position (grid_x, grid_y)"""
         cx, cy = self.clb_center(grid_x, grid_y)
         
-        # Odredimo boju bloka
+        # Determine the block color
         if avg_hpwl is not None and min_hpwl is not None and max_hpwl is not None:
             facecolor = self._get_heatmap_color(avg_hpwl, min_hpwl, max_hpwl)
         else:
@@ -303,24 +303,24 @@ class SignalVisualizer:
             facecolor=facecolor, edgecolor="#999999", linewidth=2, zorder=2)
         self.ax.add_patch(rect)
         
-        # Prikaži prosečnu HPWL vrednost ako postoji, inače "CLB"
+        # Show the average HPWL value if it exists, otherwise "CLB"
         if avg_hpwl is not None:
             label = f"{avg_hpwl:.1f}"
             fontsize = 10
-            text_color = "white"  # Uvek bela boja za tekst
+            text_color = "white"  # Always white color for text
         else:
             label = "CLB"
             fontsize = 12
             text_color = "black"
             
         self.ax.text(cx, cy, label, color=text_color, ha="center", va="center",
-                    fontsize=fontsize, weight='bold', zorder=10)  # zorder=10 iznad heat mape
+                    fontsize=fontsize, weight='bold', zorder=10)  # zorder=10 above the heat map
     
     def _draw_io_block_at_grid(self, grid_x: int, grid_y: int, avg_hpwl: float = None, min_hpwl: float = None, max_hpwl: float = None):
         """Draw an IO block at grid position (grid_x, grid_y)"""
         cx, cy = self.clb_center(grid_x, grid_y)  # Use same positioning as CLB
         
-        # Odredimo boju bloka
+        # Determine the block color
         if avg_hpwl is not None and min_hpwl is not None and max_hpwl is not None:
             facecolor = self._get_heatmap_color(avg_hpwl, min_hpwl, max_hpwl)
         else:
@@ -332,18 +332,18 @@ class SignalVisualizer:
             facecolor=facecolor, edgecolor="#333333", linewidth=2, zorder=2)
         self.ax.add_patch(rect)
         
-        # Prikaži prosečnu HPWL vrednost ako postoji, inače "IO"
+        # Show the average HPWL value if it exists, otherwise "IO"
         if avg_hpwl is not None:
             label = f"{avg_hpwl:.1f}"
             fontsize = 9
-            text_color = "white"  # Uvek bela boja za tekst
+            text_color = "white"  # Always white color for text
         else:
             label = "IO"
             fontsize = 11
             text_color = "white"
             
         self.ax.text(cx, cy, label, color=text_color, ha="center", va="center",
-                    fontsize=fontsize, weight='bold', zorder=10)  # zorder=10 iznad heat mape
+                    fontsize=fontsize, weight='bold', zorder=10)  # zorder=10 above the heat map
 
     def _draw_io_block(self, cx: int, cy: int):
         rect = patches.Rectangle(
@@ -355,7 +355,7 @@ class SignalVisualizer:
                     fontsize=11, weight='bold', zorder=3)
 
     def _draw_tracks(self, width: int, height: int):
-        """Crta routing kanale (CHANX i CHANY) između blokova - kratke trake u svakom gap-u"""
+        """Draws routing channels (CHANX and CHANY) between blocks - short strips in each gap"""
         gap_size = self.TILE_SIZE - self.CLB_SIZE
         # Better track spacing - use 80% of gap for tracks, 20% for margins
         usable_gap = gap_size * 0.8
@@ -378,7 +378,7 @@ class SignalVisualizer:
                     if is_edge:
                         io_positions.add((x, y))
 
-        # Horizontalni trackovi (CHANX) - kratke trake u svakom horizontalnom gap-u
+        # Horizontal tracks (CHANX) - short strips in each horizontal gap
         for row in range(height - 1):  # Between adjacent rows
             for col in range(width):   # For each column position
                 # Check if we should draw tracks in this gap
@@ -429,7 +429,7 @@ class SignalVisualizer:
                     self.ax.plot([track_start_x, track_end_x], [y, y], 
                                 color="#000000", linewidth=1.0, alpha=0.7, zorder=1)
 
-        # Vertikalni trackovi (CHANY) - kratke trake u svakom vertikalnom gap-u  
+        # Vertical tracks (CHANY) - short strips in each vertical gap  
         for col in range(width - 1):  # Between adjacent columns
             for row in range(height):  # For each row position
                 # Check if we should draw tracks in this gap
@@ -478,7 +478,7 @@ class SignalVisualizer:
                     self.ax.plot([x, x], [track_start_y, track_end_y],
                                 color="#000000", linewidth=1.0, alpha=0.7, zorder=1)
 
-        # Switch blokovi (SB) - beli kvadrati na presecima
+        # Switch blocks (SB) - white squares at intersections
         # Avoid drawing on outside edges and between IO blocks
         intersection_size = (self.TILE_SIZE - self.CLB_SIZE) * 0.8
         for row in range(height + 1):
@@ -516,7 +516,7 @@ class SignalVisualizer:
 
     def _draw_routes(self, routing: RoutingResult, architecture: FPGAArchitecture, 
                  show_segment_ids: bool, show_directions: bool, show_signal_labels: bool):
-        """Iterira kroz rute bez obzira da li objekt ima 'routes' ili 'nets'."""
+        """Iterates through routes regardless of whether the object has 'routes' or 'nets'."""
         if not routing:
             return
 
@@ -781,9 +781,9 @@ class SignalVisualizer:
                                 self.ax.plot([track_x, pos[0]], [pos[1], chany_center_y], 
                                             '-', color=color, linewidth=linewidth-1, alpha=0.8, zorder=7)
         
-        # Crta labelu signala ako je route_label prosleđen
+        # Draws the signal label if route_label was passed
         if route_label:
-            # Nađi SOURCE poziciju (prvi segment) za postavljanje labele
+            # Find the SOURCE position (first segment) to place the label
             source_seg = None
             for seg in segments:
                 if seg.node_type.upper() == 'SOURCE':
@@ -793,9 +793,9 @@ class SignalVisualizer:
             if source_seg:
                 pos = self._get_node_position(source_seg)
                 if pos[0] >= 0 and pos[1] >= 0:
-                    # Postavi labelu iznad SOURCE markera
+                    # Place the label above the SOURCE marker
                     self.ax.text(
-                        pos[0], pos[1] + 15,  # Offset iznad SOURCE-a
+                        pos[0], pos[1] + 15,  # Offset above the SOURCE
                         route_label,
                         color=color,
                         fontsize=9,
@@ -808,7 +808,7 @@ class SignalVisualizer:
                             edgecolor=color,
                             alpha=0.9
                         ),
-                        zorder=20  # Visok zorder da bude iznad svega
+                        zorder=20  # High zorder so it stays above everything
                     )
 
     
@@ -820,11 +820,11 @@ class SignalVisualizer:
 
     def _build_manhattan_path(self, segments: List[RouteSegment]) -> List[Dict]:
         """
-        Pretvara segment listu u Manhattan putanju koja prati grid:
+        Converts the segment list into a Manhattan path that follows the grid:
         
         SOURCE (CLB) → OPIN → CHANX (horizontal) → CHANY (vertical) → IPIN → SINK (CLB)
         
-        Pravilo: Linija može biti samo horizontalna ILI vertikalna, nikad dijagonalna
+        Rule: The line can be only horizontal OR vertical, never diagonal
         """
         path = []
         
@@ -841,46 +841,46 @@ class SignalVisualizer:
             curr_type = curr_seg.node_type.upper()
             next_type = next_seg.node_type.upper()
             
-            # PRAVILO 1: OPIN → CHANX/CHANY (izlaz iz CLB-a na kanal)
+            # RULE 1: OPIN → CHANX/CHANY (exit from the CLB to the channel)
             if curr_type == 'OPIN' and next_type in ['CHANX', 'CHANY']:
-                # Kratka linija od OPIN do najbližeg track-a
+                # Short line from OPIN to the nearest track
                 path.append({
                     'points': [(x1, y1), (x2, y2)],
                     'type': next_type,
                     'color': self.NODE_COLORS.get(next_type, '#666666')
                 })
             
-            # PRAVILO 2: CHANX → CHANX (horizontalno kretanje)
+            # RULE 2: CHANX → CHANX (horizontal movement)
             elif curr_type == 'CHANX' and next_type == 'CHANX':
-                # Mora biti na istoj Y koordinati (isti track)
-                if abs(y1 - y2) < 1:  # Isti track
+                # Must be at the same Y coordinate (same track)
+                if abs(y1 - y2) < 1:  # Same track
                     path.append({
                         'points': [(x1, y1), (x2, y2)],
                         'type': 'CHANX',
                         'color': self.NODE_COLORS['CHANX']
                     })
             
-            # PRAVILO 3: CHANY → CHANY (vertikalno kretanje)
+            # RULE 3: CHANY → CHANY (vertical movement)
             elif curr_type == 'CHANY' and next_type == 'CHANY':
-                # Mora biti na istoj X koordinati (isti track)
-                if abs(x1 - x2) < 1:  # Isti track
+                # Must be at the same X coordinate (same track)
+                if abs(x1 - x2) < 1:  # Same track
                     path.append({
                         'points': [(x1, y1), (x2, y2)],
                         'type': 'CHANY',
                         'color': self.NODE_COLORS['CHANY']
                     })
             
-            # PRAVILO 4: CHANX → CHANY ili CHANY → CHANX (switch block)
+            # RULE 4: CHANX → CHANY or CHANY → CHANX (switch block)
             elif (curr_type == 'CHANX' and next_type == 'CHANY') or \
                 (curr_type == 'CHANY' and next_type == 'CHANX'):
-                # Plava dijagonalna linija u switch bloku (kao na referentnoj slici)
+                # Blue diagonal line in the switch block (as in the reference image)
                 path.append({
                     'points': [(x1, y1), (x2, y2)],
                     'type': 'SWITCH',
-                    'color': '#1f77b4'  # Plava boja kao na slici
+                    'color': '#1f77b4'  # Blue color as in the image
                 })
             
-            # PRAVILO 5: CHANX/CHANY → IPIN (ulaz u CLB)
+            # RULE 5: CHANX/CHANY → IPIN (input to the CLB)
             elif curr_type in ['CHANX', 'CHANY'] and next_type == 'IPIN':
                 path.append({
                     'points': [(x1, y1), (x2, y2)],
@@ -888,7 +888,7 @@ class SignalVisualizer:
                     'color': self.NODE_COLORS.get(curr_type, '#666666')
                 })
             
-            # PRAVILO 6: IPIN → SINK (unutar CLB-a)
+            # RULE 6: IPIN → SINK (inside the CLB)
             elif curr_type == 'IPIN' and next_type == 'SINK':
                 path.append({
                     'points': [(x1, y1), (x2, y2)],
@@ -896,7 +896,7 @@ class SignalVisualizer:
                     'color': '#333333'
                 })
             
-            # PRAVILO 7: SOURCE → OPIN (unutar CLB-a)
+            # RULE 7: SOURCE → OPIN (inside the CLB)
             elif curr_type == 'SOURCE' and next_type == 'OPIN':
                 path.append({
                     'points': [(x1, y1), (x2, y2)],
@@ -905,7 +905,7 @@ class SignalVisualizer:
                 })
             
             else:
-                # Default: pravougaona linija (fallback)
+                # Default: rectangular line (fallback)
                 path.append({
                     'points': [(x1, y1), (x2, y2)],
                     'type': 'OTHER',
@@ -915,7 +915,7 @@ class SignalVisualizer:
         return path
 
     def _draw_segment_group(self, seg_group: Dict, base_color: str, show_directions: bool):
-        """Crta jedan logički segment (može biti linija ili L-shape)"""
+        """Draws one logical segment (can be a line or L-shape)"""
         points = seg_group['points']
         seg_type = seg_group['type']
         color = seg_group['color']
@@ -923,19 +923,19 @@ class SignalVisualizer:
         if len(points) < 2:
             return
         
-        # Debljina linije prema tipu
+        # Line thickness by type
         if seg_type in ['CHANX', 'CHANY']:
             linewidth = 2.5
             alpha = 0.8
         elif seg_type == 'SWITCH':
-            # Plave switch linije kao na referentnoj slici - srednje debljine
+            # Blue switch lines as in the reference image - medium thickness
             linewidth = 2.0
             alpha = 0.9
         else:
             linewidth = 1.5
             alpha = 0.6
         
-        # Crtaj linije između svih tačaka
+        # Draw lines between all points
         for i in range(len(points) - 1):
             x1, y1 = points[i]
             x2, y2 = points[i + 1]
@@ -943,13 +943,13 @@ class SignalVisualizer:
             self.ax.plot([x1, x2], [y1, y2], '-', 
                         color=color, linewidth=linewidth, alpha=alpha, zorder=7)
             
-            # Strelica samo za CHANX/CHANY
+            # Arrow only for CHANX/CHANY
             if show_directions and seg_type in ['CHANX', 'CHANY']:
                 self._draw_direction_arrow(x1, y1, x2, y2, color, seg_type)
                 
     def _get_node_position(self, seg: RouteSegment) -> Tuple[float, float]:
         """
-        Vraća (x, y) poziciju čvora
+        Returns the (x, y) position of the node
         """
         node_type = seg.node_type.upper()
         gx = seg.x
@@ -1000,8 +1000,8 @@ class SignalVisualizer:
 
     def _get_io_position(self, gx: int, gy: int) -> Tuple[float, float]:
         """
-        Vraća poziciju IO bloka na osnovu koordinata iz našeg layout-a
-        Koristimo stvarno pozicioniranje IO blokova iz arhitekture
+        Returns the position of the IO block based on coordinates from our layout
+        We use the actual positioning of IO blocks from the architecture
         """
         # First check if we have architecture info and this position actually has an IO block
         if self.architecture and hasattr(self.architecture, 'logic_blocks'):
@@ -1020,58 +1020,58 @@ class SignalVisualizer:
 
     def _is_io_block(self, gx: int, gy: int) -> bool:
         """
-        Detektuje da li je (gx, gy) pozicija IO bloka
+        Detects whether (gx, gy) is the position of an IO block
         """
         width = self.architecture.width if self.architecture else 8
         height = self.architecture.height if self.architecture else 8
         
-        # PRAVILO 1: Gornja ivica (y == 0)
+        # RULE 1: Top edge (y == 0)
         if gy == 0:
             return True
         
-        # PRAVILO 2: Donja ivica (y == height - 1 ili y >= height)
+        # RULE 2: Bottom edge (y == height - 1 or y >= height)
         if gy >= height - 1:
             return True
         
-        # PRAVILO 3: Leva ivica (x == 0)
+        # RULE 3: Left edge (x == 0)
         if gx == 0:
             return True
         
-        # PRAVILO 4: Desna ivica (x == width - 1 ili x >= width)
+        # RULE 4: Right edge (x == width - 1 or x >= width)
         if gx >= width - 1:
             return True
         
         return False
 
     def _draw_signal_direction_arrow(self, segments, current_index, start_x, start_y, end_x, end_y, color, seg_type):
-        """Crta strelicu u sredini segmenta na osnovu smera ka sledećem segmentu"""
+        """Draws an arrow in the middle of the segment based on the direction toward the next segment"""
         if current_index >= len(segments) - 1:
-            return  # Nema sledećeg segmenta
+            return  # No next segment
             
         current_seg = segments[current_index]
         next_seg = segments[current_index + 1]
         
-        # Debug ispis samo za krajnje segmente
+        # Debug print only for final segments
         connects_result = self._connects_to_start(current_seg, next_seg, seg_type)
         if next_seg.node_type.upper() in ['IPIN', 'SINK']:
             print(f"FINAL SEGMENT: {seg_type}({current_seg.x},{current_seg.y}) -> {next_seg.node_type.upper()}({next_seg.x},{next_seg.y}), connects_to_start={connects_result}")
         
-        # Sredina trenutnog segmenta
+        # Middle of the current segment
         mid_x = (start_x + end_x) / 2
         mid_y = (start_y + end_y) / 2
         
-        # Određuje smer strelice na osnovu sledećeg segmenta
+        # Determines the arrow direction based on the next segment
         if seg_type == 'CHANX':
-            # Za CHANX: horizontalna strelica u sredini
+            # For CHANX: horizontal arrow in the middle
             if self._connects_to_start(current_seg, next_seg, seg_type):
-                # Signal ide ka početku (levi kraj) -> strelica ka levo
+                # Signal goes toward the start (left end) -> arrow to the left
                 arrow_length = 15
                 self.ax.annotate('', xy=(mid_x - arrow_length, mid_y),
                                 xytext=(mid_x, mid_y),
                                 arrowprops=dict(arrowstyle='->', color=color, lw=2.5),
                                 zorder=9)
             else:
-                # Signal ide ka kraju (desni kraj) -> strelica ka desno
+                # Signal goes toward the end (right end) -> arrow to the right
                 arrow_length = 15
                 self.ax.annotate('', xy=(mid_x + arrow_length, mid_y),
                                 xytext=(mid_x, mid_y),
@@ -1079,17 +1079,17 @@ class SignalVisualizer:
                                 zorder=9)
                 
         elif seg_type == 'CHANY':
-            # Za CHANY: vertikalna strelica u sredini
+            # For CHANY: vertical arrow in the middle
             connects_to_start = self._connects_to_start(current_seg, next_seg, seg_type)
             if connects_to_start:
-                # Signal ide ka početku (gornji kraj) -> strelica ka gore (vizuelno nadole)
+                # Signal goes toward the start (upper end) -> arrow up (visually downward)
                 arrow_length = 15
                 self.ax.annotate('', xy=(mid_x, mid_y + arrow_length),  
                                 xytext=(mid_x, mid_y),
                                 arrowprops=dict(arrowstyle='->', color=color, lw=2.5),
                                 zorder=9)
             else:
-                # Signal ide ka kraju (donji kraj) -> strelica ka dole (vizuelno nagore)
+                # Signal goes toward the end (lower end) -> arrow down (visually upward)
                 arrow_length = 15
                 self.ax.annotate('', xy=(mid_x, mid_y - arrow_length),  
                                 xytext=(mid_x, mid_y),
@@ -1097,104 +1097,104 @@ class SignalVisualizer:
                                 zorder=9)
 
     def _connects_to_start(self, current_seg, next_seg, seg_type):
-        """Određuje smer strelice na osnovu analize stvarnih slučajeva"""
+        """Determines the arrow direction based on analysis of real cases"""
         curr_seg_type = current_seg.node_type.upper()
         next_seg_type = next_seg.node_type.upper()
         curr_x, curr_y = current_seg.x, current_seg.y
         next_x, next_y = next_seg.x, next_seg.y
         
-        # Debug za Net 0 problematične segmente
+        # Debug for Net 0 problematic segments
         if ((curr_seg_type == 'CHANY' and curr_x == 1 and curr_y == 3) or
             (curr_seg_type == 'CHANY' and curr_x == 4 and curr_y == 1) or
             (curr_seg_type == 'CHANX' and curr_x == 3 and curr_y == 3) or
             (curr_seg_type == 'CHANX' and curr_x == 5 and curr_y == 1)):
             print(f"NET0 DEBUG: {curr_seg_type}({curr_x},{curr_y}) -> {next_seg_type}({next_x},{next_y})")
         
-        # Analizirajmo svaki slučaj iz Net 10 primera:
+        # Let's analyze each case from the Net 10 example:
         
         if curr_seg_type == 'CHANX':
             if next_seg_type == 'CHANY':
-                # CHANX(5,6) -> CHANY(5,6): desno = False
+                # CHANX(5,6) -> CHANY(5,6): right = False
                 if next_x == curr_x and next_y == curr_y:
-                    return False  # desno
-                # Ostali slučajevi kao što su već definisani
+                    return False  # right
+                # Other cases as already defined
                 elif next_x == curr_x and next_y == curr_y + 1:
-                    return False  # desno  
+                    return False  # right  
                 elif next_x == curr_x - 1 and next_y == curr_y + 1:
-                    return True   # levo
+                    return True   # left
                 elif next_x == curr_x - 1 and next_y == curr_y:
-                    return True   # levo
+                    return True   # left
             elif next_seg_type == 'CHANX':
                 if next_x == curr_x + 1:
-                    return False  # desno
+                    return False  # right
                 elif next_x == curr_x - 1:
-                    return True   # levo
+                    return True   # left
             elif next_seg_type in ['IPIN', 'SINK']:
-                # CHANX -> IPIN/SINK: analiziraj poziciju
-                # Za Net 0 test slučaj:
-                # CHANX (3,3,0) -> IPIN (3,3,0) - netačno (trenutno levo)
-                # CHANX (5,1,0) -> IPIN (5,1,0) - netačno (trenutno levo)
+                # CHANX -> IPIN/SINK: analyze the position
+                # For the Net 0 test case:
+                # CHANX (3,3,0) -> IPIN (3,3,0) - incorrect (currently left)
+                # CHANX (5,1,0) -> IPIN (5,1,0) - incorrect (currently left)
                 
-                # Koristimo X koordinatu da odredimo smer
-                if curr_x >= 4:  # Desni blokovi - strelica levo
-                    return True   # levo
-                else:  # Levi blokovi - strelica desno
-                    return False  # desno
+                # We use the X coordinate to determine the direction
+                if curr_x >= 4:  # Right blocks - arrow to the left
+                    return True   # left
+                else:  # Left blocks - arrow to the right
+                    return False  # right
                     
         elif curr_seg_type == 'CHANY':
             if next_seg_type == 'CHANX':
-                # Svi CHANY -> CHANX slučajevi u Net 10 trebaju dole
-                # CHANY(5,5) -> CHANX(6,4): dole
-                # CHANY(6,4) -> CHANX(6,3): gore (ali u Net 10 je pogrešno označeno)
+                # All CHANY -> CHANX cases in Net 10 need down
+                # CHANY(5,5) -> CHANX(6,4): down
+                # CHANY(6,4) -> CHANX(6,3): up (but in Net 10 it is marked incorrectly)
                 if next_x == curr_x + 1 and next_y == curr_y - 1:
-                    return False  # dole
+                    return False  # down
                 elif next_x == curr_x and next_y == curr_y - 1:
-                    return False  # dole
+                    return False  # down
                 elif next_x == curr_x and next_y == curr_y:
-                    return True  # ISPRAVKA: chanY(a,b) -> chanX(a,b) = gore
+                    return True  # FIX: chanY(a,b) -> chanX(a,b) = up
                 elif next_x == curr_x + 1 and next_y == curr_y:
-                    return False  # PROMENIO: trebalo bi dole umesto gore
+                    return False  # CHANGED: should be down instead of up
             elif next_seg_type == 'CHANY':
-                # CHANY(5,6) -> CHANY(5,5): dole
-                # CHANY(5,5) -> CHANY(5,4): dole  
+                # CHANY(5,6) -> CHANY(5,5): down
+                # CHANY(5,5) -> CHANY(5,4): down  
                 if next_y == curr_y - 1:
-                    return False  # dole
+                    return False  # down
                 elif next_y == curr_y + 1:
-                    return True   # gore
+                    return True   # up
             elif next_seg_type in ['IPIN', 'SINK']:
-                # CHANY -> IPIN/SINK: analiziraj poziciju
-                # Ako je CHANY na istoj poziciji kao IPIN, onda zavisi od konteksta
+                # CHANY -> IPIN/SINK: analyze the position
+                # If CHANY is at the same position as IPIN, it depends on the context
                 if next_x == curr_x and next_y == curr_y:
-                    # Ovo je CHANY segment koji se direktno povezuje na blok
-                    # Potrebno je analizirati iz kog smera dolazi signal
-                    # Privremeno koristimo analizu koordinata
-                    # Ako je Y koordinata CHANY veća, strelica ide dole
-                    # Ako je Y koordinata CHANY manja, strelica ide gore
+                    # This is a CHANY segment that connects directly to the block
+                    # We need to analyze from which direction the signal comes
+                    # We temporarily use coordinate analysis
+                    # If the Y coordinate of CHANY is larger, the arrow goes down
+                    # If the Y coordinate of CHANY is smaller, the arrow goes up
                     
-                    # Za Net 0 test slučaj:
-                    # CHANY (1,3,0) -> netačno (treba da ide dole umesto gore)
-                    # CHANY (4,1,0) -> netačno (treba da ide dole umesto gore)
+                    # For the Net 0 test case:
+                    # CHANY (1,3,0) -> incorrect (should go down instead of up)
+                    # CHANY (4,1,0) -> incorrect (should go down instead of up)
                     
-                    # Koristimo Y koordinatu da odredimo smer
-                    if curr_y >= 2:  # Viši blokovi - strelica dole
-                        return False  # dole
-                    else:  # Niži blokovi - strelica gore
-                        return True   # gore
+                    # We use the Y coordinate to determine the direction
+                    if curr_y >= 2:  # Higher blocks - arrow down
+                        return False  # down
+                    else:  # Lower blocks - arrow up
+                        return True   # up
                 else:
-                    return True  # gore (default)
+                    return True  # up (default)
         
         # Default
         return False
 
     def _draw_direction_arrow(self, x1, y1, x2, y2, color, node_type):
-        """Crta strelicu u sredini žice koja pokazuje smer"""
+        """Draws an arrow in the middle of the wire showing the direction"""
         mid_x = (x1 + x2) / 2
         mid_y = (y1 + y2) / 2
         
         dx = x2 - x1
         dy = y2 - y1
         
-        # Normalizuj vektor
+        # Normalize the vector
         length = (dx**2 + dy**2)**0.5
         if length < 1:
             return
@@ -1202,7 +1202,7 @@ class SignalVisualizer:
         dx /= length
         dy /= length
         
-        # Veličina strelice - povećana da se bolje vidi
+        # Arrow size - increased for better visibility
         arrow_size = 15
         
         self.ax.annotate('', xy=(mid_x + dx*arrow_size, mid_y + dy*arrow_size),
@@ -1212,25 +1212,25 @@ class SignalVisualizer:
 
     def _extract_all_paths(self, root_node) -> List[List[RouteSegment]]:
         """
-        Ekstraktuje sve putanje od ROOT do SINK čvorova (tree traversal)
+        Extracts all paths from ROOT to SINK nodes (tree traversal)
         """
         all_paths = []
         
         def traverse(node, current_path):
-            """Rekurzivna DFS traversal"""
+            """Recursive DFS traversal"""
             if not node:
                 return
             
-            # ✅ node JE već RouteSegment (ne node.segment)
+            # ✅ node IS already a RouteSegment (not node.segment)
             new_path = current_path + [node]
             
-            # Ako je SINK, završi putanju
+            # If it is SINK, finish the path
             node_type = getattr(node, 'node_type', '').upper()
             if node_type == 'SINK':
                 all_paths.append(new_path)
                 return
             
-            # Rekurzivno obiđi decu
+            # Recursively traverse the children
             children = getattr(node, 'children', [])
             if children:
                 for child in children:
@@ -1242,33 +1242,33 @@ class SignalVisualizer:
 
     def _draw_bounding_boxes_heatmap(self, routing: RoutingResult):
         """
-        Crta crne bounding boxove sa malom alpha vrednošću za heat mapu.
-        Preklapanja se vide kao tamnija siva područja.
+        Draws black bounding boxes with a small alpha value for the heat map.
+        Overlaps appear as darker gray areas.
         """
         nets = getattr(routing, 'routes', getattr(routing, 'nets', []))
         
         for ridx, net in enumerate(nets):
-            # ✅ Dobavi segmente (tree ili flat lista)
+            # ✅ Fetch segments (tree or flat list)
             segments = []
             
             if hasattr(net, 'root') and net.root:
-                # Tree struktura - koristi _extract_all_paths
+                # Tree structure - uses _extract_all_paths
                 paths = self._extract_all_paths(net.root)
                 for path in paths:
                     segments.extend(path)
             elif hasattr(net, 'get_all_source_to_sink_paths'):
-                # Ako postoji direktna metoda
+                # If a direct method exists
                 paths = net.get_all_source_to_sink_paths()
                 for path in paths:
                     segments.extend(path)
             else:
-                # Flat lista segmenata
+                # Flat list of segments
                 segments = getattr(net, 'segments', [])
             
             if not segments:
                 continue
             
-            # ✅ Filtriraj validne koordinate
+            # ✅ Filter valid coordinates
             valid_segments = [s for s in segments 
                             if hasattr(s, 'x') and hasattr(s, 'y') 
                             and s.x >= 0 and s.y >= 0]
@@ -1276,64 +1276,64 @@ class SignalVisualizer:
             if not valid_segments:
                 continue
             
-            # ✅ Nađi bounding box koordinate
+            # ✅ Find bounding box coordinates
             min_x = min(s.x for s in valid_segments)
             max_x = max(s.x for s in valid_segments)
             min_y = min(s.y for s in valid_segments)
             max_y = max(s.y for s in valid_segments)
             
-            # ✅ Konvertuj u piksel koordinate (pomereno za pola CLB bloka gore i desno)
-            offset_x = self.CLB_SIZE / 2  # Pola CLB bloka desno
-            offset_y = self.CLB_SIZE / 2  # Pola CLB bloka gore
+            # ✅ Convert to pixel coordinates (shifted by half a CLB block up and right)
+            offset_x = self.CLB_SIZE / 2  # Half a CLB block to the right
+            offset_y = self.CLB_SIZE / 2  # Half a CLB block up
             
             x1 = min_x * self.TILE_SIZE + offset_x
             x2 = (max_x + 1) * self.TILE_SIZE + offset_x
             y1 = min_y * self.TILE_SIZE + offset_y
             y2 = (max_y + 1) * self.TILE_SIZE + offset_y
             
-            # ✅ Crni bounding box sa malom alpha za heat map
+            # ✅ Black bounding box with small alpha for the heat map
             rect = patches.Rectangle(
                 (x1, y1), 
                 x2 - x1, 
                 y2 - y1,
                 linewidth=0,           
                 edgecolor='none',        
-                facecolor='black',         # Crna boja
-                alpha=0.08,               # Mala alpha vrednost - preklapanja će biti tamnija
+                facecolor='black',         # Black color
+                alpha=0.08,               # Small alpha value - overlaps will be darker
                 zorder=3
             )
             self.ax.add_patch(rect)
 
     def _draw_bounding_boxes(self, routing: RoutingResult, show_labels: bool = False):
         """
-        Crta bounding box (HPWL) za svaki signal
+        Draws the bounding box (HPWL) for each signal
         
         HPWL (Half-Perimeter Wire Length) = (max_x - min_x + 1) + (max_y - min_y + 1)
         """
         nets = getattr(routing, 'routes', getattr(routing, 'nets', []))
         
         for ridx, net in enumerate(nets):
-            # ✅ Dobavi segmente (tree ili flat lista)
+            # ✅ Fetch segments (tree or flat list)
             segments = []
             
             if hasattr(net, 'root') and net.root:
-                # Tree struktura - koristi _extract_all_paths
+                # Tree structure - uses _extract_all_paths
                 paths = self._extract_all_paths(net.root)
                 for path in paths:
                     segments.extend(path)
             elif hasattr(net, 'get_all_source_to_sink_paths'):
-                # Ako postoji direktna metoda
+                # If a direct method exists
                 paths = net.get_all_source_to_sink_paths()
                 for path in paths:
                     segments.extend(path)
             else:
-                # Flat lista segmenata
+                # Flat list of segments
                 segments = getattr(net, 'segments', [])
             
             if not segments:
                 continue
             
-            # ✅ Filtriraj validne koordinate
+            # ✅ Filter valid coordinates
             valid_segments = [s for s in segments 
                             if hasattr(s, 'x') and hasattr(s, 'y') 
                             and s.x >= 0 and s.y >= 0]
@@ -1341,52 +1341,52 @@ class SignalVisualizer:
             if not valid_segments:
                 continue
             
-            # ✅ Nađi bounding box koordinate
+            # ✅ Find bounding box coordinates
             min_x = min(s.x for s in valid_segments)
             max_x = max(s.x for s in valid_segments)
             min_y = min(s.y for s in valid_segments)
             max_y = max(s.y for s in valid_segments)
             
-            # ✅ Konvertuj u piksel koordinate (pomereno za pola CLB bloka gore i desno)
-            offset_x = self.CLB_SIZE / 2  # Pola CLB bloka desno
-            offset_y = self.CLB_SIZE / 2  # Pola CLB bloka gore
+            # ✅ Convert to pixel coordinates (shifted by half a CLB block up and right)
+            offset_x = self.CLB_SIZE / 2  # Half a CLB block to the right
+            offset_y = self.CLB_SIZE / 2  # Half a CLB block up
             
             x1 = min_x * self.TILE_SIZE + offset_x
             x2 = (max_x + 1) * self.TILE_SIZE + offset_x
             y1 = min_y * self.TILE_SIZE + offset_y
             y2 = (max_y + 1) * self.TILE_SIZE + offset_y
             
-            # ✅ Boja signala
+            # ✅ Signal color
             signal_color = self.ROUTE_COLORS[ridx % len(self.ROUTE_COLORS)]
             
-            # ✅ Crta isprekidani pravougaonik
+            # ✅ Draws a dashed rectangle
             rect = patches.Rectangle(
                 (x1, y1), 
             x2 - x1, 
             y2 - y1,
             linewidth=0,           
             edgecolor='none',        
-            facecolor=signal_color,  # Boja signala
+            facecolor=signal_color,  # Signal color
             alpha=0.15,               
             zorder=3
             )
             self.ax.add_patch(rect)
             
-            # ✅ HPWL tekst (gornji levi ugao) - prikaži samo ako je show_labels=True
+            # ✅ HPWL text (top-left corner) - show only if show_labels=True
             if show_labels:
                 hpwl = (max_x - min_x + 1) + (max_y - min_y + 1)
                 net_name = getattr(net, 'net_name', getattr(net, 'name', f'net_{ridx}'))
                 
                 self.ax.text(
-                    x1 + 5, y2 - 5,  # Gornji levi ugao + offset
+                    x1 + 5, y2 - 5,  # Top-left corner + offset
                     f"{net_name}\nHPWL={hpwl}",
-                    color=signal_color,  # Boja signala za tekst
+                    color=signal_color,  # Signal color for text
                     fontsize=8,
                     weight='bold',
                     bbox=dict(
                         boxstyle='round,pad=0.4',
                         facecolor='white',
-                        edgecolor=signal_color,  # Boja signala za ivicu
+                        edgecolor=signal_color,  # Signal color for the edge
                         alpha=0.85
                     ),
                     zorder=12
@@ -1394,24 +1394,24 @@ class SignalVisualizer:
 
     def _draw_legend(self, routing: RoutingResult):
         """
-        Legenda sa SOURCE/SINK markerima u bojama signala
+        Legend with SOURCE/SINK markers in the signal colors
         """
         legend_elements = []
         
         nets = getattr(routing, 'routes', getattr(routing, 'nets', []))
         
-        for i, net in enumerate(nets[:8]):  # Prvih 8 signala
+        for i, net in enumerate(nets[:8]):  # First 8 signals
             net_name = getattr(net, 'net_name', getattr(net, 'name', f'net_{i}'))
             color = self.ROUTE_COLORS[i % len(self.ROUTE_COLORS)]
             
-            # ✅ SOURCE marker (kvadrat) + linija
+            # ✅ SOURCE marker (square) + line
             legend_elements.append(
                 Line2D([0], [0], 
-                    marker='s',              # Kvadrat
-                    color=color,             # Boja linije
+                    marker='s',              # Square
+                    color=color,             # Line color
                     linewidth=2,
                     markersize=8,
-                    markerfacecolor=color,   # Boja kvadrata
+                    markerfacecolor=color,   # Square color
                     markeredgecolor='white',
                     markeredgewidth=1,
                     label=net_name)
@@ -1433,26 +1433,26 @@ class SignalVisualizer:
                                 show_bounding_boxes: bool, architecture_file: str, 
                                 routing_file: str, filter_type: str, filter_value: int):
         """
-        Dodaje naslov i podnaslov na osnovu prikazanih opcija i filtera
+        Adds title and subtitle based on the displayed options and filter
         """
-        # Odredi glavni naslov
+        # Determine the main title
         if show_heatmap:
-            title = "HEAT MAPA"
+            title = "HEAT MAP"
         elif show_signals and not show_bounding_boxes:
-            title = "PRIKAZ SIGNALA"
+            title = "SIGNAL VIEW"
         elif show_bounding_boxes:
-            title = "BOUNDING BOXOVI"
+            title = "BOUNDING BOXES"
         else:
-            title = "FPGA VIZUALIZACIJA"
+            title = "FPGA VISUALIZATION"
         
-        # Postavi naslov (gornji deo slike)
+        # Set the title (upper part of the image)
         self.fig.suptitle(title, fontsize=20, fontweight='bold', y=0.98)
         
-        # GORNJI LEVI ĆOŠAK - Nazivi fajlova
+        # TOP-LEFT CORNER - File names
         file_info_lines = []
         if architecture_file:
             arch_name = os.path.basename(architecture_file)
-            file_info_lines.append(f"Arhitektura: {arch_name}")
+            file_info_lines.append(f"Architecture: {arch_name}")
         
         if routing_file:
             route_name = os.path.basename(routing_file)
@@ -1476,16 +1476,16 @@ class SignalVisualizer:
                         ),
                         zorder=100)
         
-        # DONJI DEO SLIKE - Filter informacije
+        # BOTTOM OF IMAGE - Filter information
         if filter_type and filter_value is not None:
             if filter_type == "first":
-                filter_text = f"Filter: Prvih {filter_value} signala"
+                filter_text = f"Filter: First {filter_value} signals"
             elif filter_type == "last":
-                filter_text = f"Filter: Poslednjih {filter_value} signala"
+                filter_text = f"Filter: Last {filter_value} signals"
             elif filter_type == "less_than":
-                filter_text = f"Filter: Signali sa manje od {filter_value} segmenata"
+                filter_text = f"Filter: Signals with fewer than {filter_value} segments"
             elif filter_type == "more_than":
-                filter_text = f"Filter: Signali sa više od {filter_value} segmenata"
+                filter_text = f"Filter: Signals with more than {filter_value} segments"
             else:
                 filter_text = None
             

@@ -1,4 +1,4 @@
-// FPGA Visualizer - JavaScript klijentski kod
+// FPGA Visualizer - JavaScript client code
 
 class FPGAVisualizer {
     constructor() {
@@ -10,22 +10,22 @@ class FPGAVisualizer {
         this.btnVisualize = document.getElementById('visualizeBtn');
         this.chkGrid = document.getElementById('showGrid');
         
-        // Istorija učitanih fajlova
+        // History of loaded files
         this.architectureHistory = [];
         this.routingHistory = [];
         
-        console.log("🔧 FPGA Visualizer inicijalizovan");
+        console.log("🔧 FPGA Visualizer initialized");
         this.initEventListeners();
     }
 
     initEventListeners() {
-        console.log("🔧 Inicijalizujem event listenere...");
+        console.log("🔧 Initializing event listeners...");
         
-        // Ručno poveži sve dugmad
+        // Manually bind all buttons
         this.bindButton('#visualizeBtn', () => this.visualizeSelectedSignals());
-        this.bindButton('#analyzeBtn', () => this.analyzeConflicts());  // Ispravljeno: analyzeBtn umesto analyzeConflictsBtn
+        this.bindButton('#analyzeBtn', () => this.analyzeConflicts());  // Fixed: analyzeBtn instead of analyzeConflictsBtn
         
-        // Poveži file input change event-e
+        // Bind file input change events
         this.bindFileInput('archFile', () => this.onArchFileSelected());
         this.bindFileInput('circuitFile', () => this.onCircuitFileSelected());
         this.bindFileInput('routingFile', () => this.onRoutingFileSelected());
@@ -33,16 +33,16 @@ class FPGAVisualizer {
         this.bindButton('#selectAllSignals', () => this.selectAllSignals());
         this.bindButton('#deselectAllSignals', () => this.deselectAllSignals());
         
-        // Filter dugme
+        // Filter button
         this.bindButton('#applyFilterBtn', () => this.applySignalFilter());
         
-        // Heat mapa checkbox logika
+        // Heat map checkbox logic
         const heatmapCheckbox = document.getElementById('showHeatmap');
         if (heatmapCheckbox) {
             heatmapCheckbox.addEventListener('change', () => this.onHeatmapToggle());
         }
         
-        // Ostali checkboxovi - ako se čekiraju, odčekiraj heat mapu
+        // Other checkboxes - if checked, uncheck the heat map
         const otherCheckboxes = ['showSignals', 'showDirections', 'showBoundingBoxes', 'showSignalLabels'];
         otherCheckboxes.forEach(id => {
             const checkbox = document.getElementById(id);
@@ -51,19 +51,19 @@ class FPGAVisualizer {
             }
         });
 
-        console.log("✅ Event listeneri inicijalizovani");
+        console.log("✅ Event listeners initialized");
     }
 
     bindButton(selector, handler) {
         const button = document.querySelector(selector);
         if (button) {
             button.addEventListener('click', () => {
-                console.log(`🖱️ Kliknuto na dugme: ${selector}`);
+                console.log(`🖱️ Button clicked: ${selector}`);
                 handler();
             });
-            console.log(`✅ Povezan dugme: ${selector}`);
+            console.log(`✅ Bound button: ${selector}`);
         } else {
-            console.log(`❌ Dugme nije pronađeno: ${selector}`);
+            console.log(`❌ Button not found: ${selector}`);
         }
     }
 
@@ -71,15 +71,15 @@ class FPGAVisualizer {
         const input = document.getElementById(inputId);
         if (input) {
             input.addEventListener('change', changeHandler);
-            console.log(`✅ Povezan file input: ${inputId}`);
+            console.log(`✅ Bound file input: ${inputId}`);
         }
     }
 
     onArchFileSelected() {
         const fileInput = document.getElementById('archFile');
         if (fileInput.files.length > 0) {
-            console.log('🏗️ Izabrana arhitektura:', fileInput.files[0].name);
-            // Automatski pokreni upload
+            console.log('🏗️ Selected architecture:', fileInput.files[0].name);
+            // Automatically start upload
             this.uploadArchitecture();
         }
     }
@@ -87,7 +87,7 @@ class FPGAVisualizer {
     onRoutingFileSelected() { 
         const fileInput = document.getElementById('routingFile');
         if (fileInput.files.length > 0) {
-            console.log('🧭 Izabrano rutiranje:', fileInput.files[0].name);
+            console.log('🧭 Selected routing:', fileInput.files[0].name);
             this.uploadRoutingAndParseSignals();
         }
     }
@@ -98,7 +98,7 @@ class FPGAVisualizer {
         if (!file) return;
 
         this.uploadInProgress = true;
-        this.showMessage('Učitavam .route fajl...', 'info');
+        this.showMessage('Loading .route file...', 'info');
 
         const formData = new FormData();
         formData.append('routing_file', file);
@@ -118,22 +118,22 @@ class FPGAVisualizer {
             if (data.success) {
                 this.loadedSignals = data.signals || [];
                 this.populateSignalsList(this.loadedSignals);
-                this.showMessage(`Učitano ${this.loadedSignals.length} signala`, 'success');
+                this.showMessage(`Loaded ${this.loadedSignals.length} signals`, 'success');
                 
-                // Dodaj u istoriju
+                // Add to history
                 this.addToRoutingHistory(file.name);
                 
-                // Postavi currentRouting i currentArchitecture kao "učitano"
-                // (potrebno za dugme "Analiziraj konflikte")
+                // Set currentRouting and currentArchitecture as "loaded"
+                // (required for the "Analyze Conflicts" button)
                 this.currentRouting = { loaded: true };
                 this.currentArchitecture = { loaded: true };
             } else {
-                throw new Error(data.error || 'Nepoznata greška');
+                throw new Error(data.error || 'Unknown error');
             }
 
         } catch (error) {
             console.error('Error loading routing file:', error);
-            this.showMessage(`Greška: ${error.message}`, 'error');
+            this.showMessage(`Error: ${error.message}`, 'error');
         } finally {
             this.uploadInProgress = false;
         }
@@ -176,7 +176,7 @@ class FPGAVisualizer {
             
             const info = document.createElement('span');
             info.className = 'signal-info';
-            info.textContent = `${signal.segment_count || signal.fanout || '?'} čvorova`;
+            info.textContent = `${signal.segment_count || signal.fanout || '?'} nodes`;
             
             
             item.appendChild(checkbox);
@@ -206,7 +206,7 @@ class FPGAVisualizer {
     }
     
     addToArchitectureHistory(filename) {
-        const timestamp = new Date().toLocaleString('sr-RS', {
+        const timestamp = new Date().toLocaleString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit'
@@ -221,7 +221,7 @@ class FPGAVisualizer {
     }
     
     addToRoutingHistory(filename) {
-        const timestamp = new Date().toLocaleString('sr-RS', {
+        const timestamp = new Date().toLocaleString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit'
@@ -236,11 +236,11 @@ class FPGAVisualizer {
     }
     
     updateFileHistory() {
-        // Ažuriraj arhitekturu listu
+        // Update the architecture list
         const archList = document.getElementById('archHistoryList');
         if (archList) {
             if (this.architectureHistory.length === 0) {
-                archList.innerHTML = '<li class="history-empty">Nema učitanih fajlova</li>';
+                archList.innerHTML = '<li class="history-empty">No files loaded</li>';
             } else {
                 archList.innerHTML = this.architectureHistory.map(item => `
                     <li>
@@ -252,11 +252,11 @@ class FPGAVisualizer {
             }
         }
         
-        // Ažuriraj routing listu
+        // Update the routing list
         const routeList = document.getElementById('routeHistoryList');
         if (routeList) {
             if (this.routingHistory.length === 0) {
-                routeList.innerHTML = '<li class="history-empty">Nema učitanih fajlova</li>';
+                routeList.innerHTML = '<li class="history-empty">No files loaded</li>';
             } else {
                 routeList.innerHTML = this.routingHistory.map(item => `
                     <li>
@@ -277,48 +277,48 @@ class FPGAVisualizer {
         const totalSignals = allCheckboxes.length;
         
         if (filterType === 'none') {
-            // Čekiraj sve signale
+            // Check all signals
             allCheckboxes.forEach(cb => cb.checked = true);
-            this.showMessage('Svi signali odabrani', 'success');
+            this.showMessage('All signals selected', 'success');
             return;
         }
         
-        // Prvo odčekiraj sve
+        // First uncheck all
         allCheckboxes.forEach(cb => cb.checked = false);
         
         if (filterType === 'first') {
-            // Čekiraj prvih N signala
+            // Check the first N signals
             const toCheck = allCheckboxes.slice(0, filterValue);
             toCheck.forEach(cb => cb.checked = true);
             const unchecked = totalSignals - toCheck.length;
-            this.showMessage(`Odabrano prvih ${toCheck.length} signala (odčekirano ${unchecked})`, 'success');
+            this.showMessage(`Selected first ${toCheck.length} signals (${unchecked} unchecked)`, 'success');
         }
         else if (filterType === 'last') {
-            // Čekiraj poslednjih N signala
+            // Check the last N signals
             const toCheck = allCheckboxes.slice(-filterValue);
             toCheck.forEach(cb => cb.checked = true);
             const unchecked = totalSignals - toCheck.length;
-            this.showMessage(`Odabrano poslednjih ${toCheck.length} signala (odčekirano ${unchecked})`, 'success');
+            this.showMessage(`Selected last ${toCheck.length} signals (${unchecked} unchecked)`, 'success');
         }
         else if (filterType === 'less_than') {
-            // Čekiraj signale sa manje od N segmenata
+            // Check signals with fewer than N segments
             const filtered = allCheckboxes.filter(cb => {
                 const segmentCount = parseInt(cb.dataset.segmentCount) || 0;
                 return segmentCount < filterValue;
             });
             filtered.forEach(cb => cb.checked = true);
             const unchecked = totalSignals - filtered.length;
-            this.showMessage(`Odabrano ${filtered.length} signala sa manje od ${filterValue} segmenata (odčekirano ${unchecked})`, 'success');
+            this.showMessage(`Selected ${filtered.length} signals with fewer than ${filterValue} segments (${unchecked} unchecked)`, 'success');
         }
         else if (filterType === 'more_than') {
-            // Čekiraj signale sa više od N segmenata
+            // Check signals with more than N segments
             const filtered = allCheckboxes.filter(cb => {
                 const segmentCount = parseInt(cb.dataset.segmentCount) || 0;
                 return segmentCount > filterValue;
             });
             filtered.forEach(cb => cb.checked = true);
             const unchecked = totalSignals - filtered.length;
-            this.showMessage(`Odabrano ${filtered.length} signala sa više od ${filterValue} segmenata (odčekirano ${unchecked})`, 'success');
+            this.showMessage(`Selected ${filtered.length} signals with more than ${filterValue} segments (${unchecked} unchecked)`, 'success');
         }
     }
 
@@ -326,7 +326,7 @@ class FPGAVisualizer {
         const heatmapCheckbox = document.getElementById('showHeatmap');
         
         if (heatmapCheckbox && heatmapCheckbox.checked) {
-            // Ako je heat mapa čekirana, odčekiraj sve ostale opcije
+            // If the heat map is checked, uncheck all other options
             const showSignals = document.getElementById('showSignals');
             const showDirections = document.getElementById('showDirections');
             const showBoundingBoxes = document.getElementById('showBoundingBoxes');
@@ -342,7 +342,7 @@ class FPGAVisualizer {
     onOtherOptionToggle() {
         const heatmapCheckbox = document.getElementById('showHeatmap');
         
-        // Ako je bilo koja druga opcija čekirana, odčekiraj heat mapu
+        // If any other option is checked, uncheck the heat map
         const showSignals = document.getElementById('showSignals');
         const showDirections = document.getElementById('showDirections');
         const showBoundingBoxes = document.getElementById('showBoundingBoxes');
@@ -366,7 +366,7 @@ class FPGAVisualizer {
         console.log('Selected signals:', selectedSignals);
 
         if (selectedSignals.length === 0) {
-            this.showMessage('Nema selektovanih signala', 'warning');
+            this.showMessage('No signals selected', 'warning');
             return;
         }
 
@@ -376,12 +376,12 @@ class FPGAVisualizer {
         const showSignalLabels = document.getElementById('showSignalLabels');
         const showHeatmap = document.getElementById('showHeatmap');
         
-        // Dobavi filter informacije
+        // Get filter information
         const filterType = document.getElementById('filterType');
         const filterValue = document.getElementById('filterValue');
 
         try {
-            this.showMessage('Generiše se vizuelizacija...', 'info');
+            this.showMessage('Generating visualization...', 'info');
             
             const response = await fetch('/api/visualize', {
                 method: 'POST',
@@ -408,55 +408,55 @@ class FPGAVisualizer {
             
             if (data.success && data.image_path) {
                 this.renderImage(data.image_path);
-                this.showMessage(`Vizuelizovano ${data.signals_visualized} signala`, 'success');
+                this.showMessage(`Visualized ${data.signals_visualized} signals`, 'success');
             } else {
-                throw new Error(data.error || 'Nepoznata greška');
+                throw new Error(data.error || 'Unknown error');
             }
 
         } catch (error) {
             console.error('Visualization error:', error);
-            this.showMessage(`Greška: ${error.message}`, 'error');
+            this.showMessage(`Error: ${error.message}`, 'error');
         }
     }
 
     onCircuitFileSelected() {
         const fileInput = document.getElementById('circuitFile');
         if (fileInput.files.length > 0) {
-            console.log('🔌 Izabrano kolo:', fileInput.files[0].name);
-            // Automatski pokreni upload
+            console.log('🔌 Selected circuit:', fileInput.files[0].name);
+            // Automatically start upload
             this.uploadCircuit();
         }
     }
 
     async uploadArchitecture() {
         if (this.uploadInProgress) {
-            this.showMessage('Upload je u toku, sačekajte...', 'info');
+            this.showMessage('Upload in progress, please wait...', 'info');
             return;
         }
 
         const fileInput = document.getElementById('archFile');
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            this.showMessage('Molimo odaberite XML fajl', 'error');
+            this.showMessage('Please select an XML file', 'error');
             return;
         }
 
         const file = fileInput.files[0];
         
-        // Proveri tip fajla
+        // Check file type
         if (!file.name.toLowerCase().endsWith('.xml')) {
-            this.showMessage('Podržani format: .xml', 'error');
+            this.showMessage('Supported format: .xml', 'error');
             this.resetFileInput('archFile');
             return;
         }
 
         this.uploadInProgress = true;
-        this.showMessage('Učitavam arhitekturu...', 'info');
+        this.showMessage('Loading architecture...', 'info');
 
         const formData = new FormData();
         formData.append('file', file);
 
         try {
-            console.log('📤 Šaljem arhitekturu:', file.name);
+            console.log('📤 Sending architecture:', file.name);
             
             const response = await fetch('/upload/architecture', {
                 method: 'POST',
@@ -471,13 +471,13 @@ class FPGAVisualizer {
             }
             
             const data = await response.json();
-            console.log('📊 Odgovor:', data);
+            console.log('📊 Response:', data);
             
             if (data.success) {
-                this.showMessage('Arhitektura uspešno učitana!', 'success');
+                this.showMessage('Architecture loaded successfully!', 'success');
                 this.currentArchitecture = data.architecture || { loaded: true };
                 
-                // Dodaj u istoriju
+                // Add to history
                 this.addToArchitectureHistory(file.name);
                 
                 this.updateStatus();
@@ -486,11 +486,11 @@ class FPGAVisualizer {
             }
             
         } catch (error) {
-            console.error('💥 Greška:', error);
-            this.showMessage('💥 Greška: ' + error.message, 'error');
+            console.error('💥 Error:', error);
+            this.showMessage('💥 Error: ' + error.message, 'error');
         } finally {
             this.uploadInProgress = false;
-            // NE resetuj file input ovde - ostavi ga za korisnika da vidi šta je izabrao
+            // DO NOT reset the file input here - leave it so the user can see what they selected
         }
     }
 
@@ -498,24 +498,24 @@ class FPGAVisualizer {
         const fileInput = document.getElementById(inputId);
         if (fileInput) {
             fileInput.value = '';
-            console.log(`🔄 Resetovan file input: ${inputId}`);
+            console.log(`🔄 Reset file input: ${inputId}`);
         }
     }
 
     async analyzeConflicts() {
         if (!this.currentRouting && !this.currentCircuit) {
-            this.showMessage('Prvo učitajte rutiranje (.route fajl)', 'error');
+            this.showMessage('Load the routing first (.route file)', 'error');
             return;
         }
 
         const selectedSignals = this.getSelectedSignals();
         
         if (selectedSignals.length === 0) {
-            this.showMessage('Molimo selektujte bar jedan signal', 'error');
+            this.showMessage('Please select at least one signal', 'error');
             return;
         }
 
-        this.showMessage(`Analiziram konflikte za ${selectedSignals.length} signala...`, 'info');
+        this.showMessage(`Analyzing conflicts for ${selectedSignals.length} signals...`, 'info');
 
         try {
             const response = await fetch('/analysis/conflicts', {
@@ -533,45 +533,45 @@ class FPGAVisualizer {
             const data = await response.json();
             
             if (data.success) {
-                this.showMessage(`Analiza konflikata završena za ${data.num_signals || selectedSignals.length} signala!`, 'success');
+                this.showMessage(`Conflict analysis completed for ${data.num_signals || selectedSignals.length} signals!`, 'success');
                 this.displayConflictResults(data);
             } else {
                 this.showMessage(data.error, 'error');
             }
         } catch (error) {
-            console.error('Greška:', error);
-            this.showMessage('Greška: ' + error.message, 'error');
+            console.error('Error:', error);
+            this.showMessage('Error: ' + error.message, 'error');
         }
     }
 
     renderImage(filename) {
         const vizArea = document.getElementById('visualizationArea');
         if (!vizArea) {
-            console.error('❌ Visualization area ne postoji!');
+            console.error('❌ Visualization area does not exist!');
             return;
         }
 
-        // ✅ Samo ime fajla (bez putanje)
+        // ✅ File name only (without path)
         const safe = filename.replace(/^static\/output\//, '').replace(/\\/g, '/');
         const url = `/download/${encodeURIComponent(safe)}`;
         const bust = `?t=${Date.now()}`;
 
-        console.log(`🖼️ Učitavam sliku: ${url}${bust}`);  // DEBUG
+        console.log(`🖼️ Loading image: ${url}${bust}`);  // DEBUG
 
         vizArea.innerHTML = `
             <div class="results-section">
-                <h3>👁️ Vizuelizacija Signala</h3>
+                <h3>👁️ Signal Visualization</h3>
                 <div class="image-container">
                     <img id="visualizationImage"
                         src="${url}${bust}"
                         alt="Signal Visualization"
                         class="visualization-image"
-                        onload="console.log('✅ Slika učitana!');"
-                        onerror="console.error('❌ Greška pri učitavanju slike:', this.src); this.onerror=null;">
+                        onload="console.log('✅ Image loaded!');"
+                        onerror="console.error('❌ Error loading image:', this.src); this.onerror=null;">
                 </div>
                 <div class="image-actions">
-                    <a href="${url}" download class="download-link">Preuzmi sliku</a>
-                    <button onclick="window.open('${url}', '_blank')" class="view-link">Otvori u novom prozoru</button>
+                    <a href="${url}" download class="download-link">Download image</a>
+                    <button onclick="window.open('${url}', '_blank')" class="view-link">Open in new window</button>
                 </div>
             </div>
         `;
@@ -581,7 +581,7 @@ class FPGAVisualizer {
         const resultsDiv = document.getElementById('conflictResults');
         if (!resultsDiv) return;
         
-        const hubs = data.hubs && data.hubs.length > 0 ? data.hubs.join(', ') : 'Nema habova';
+        const hubs = data.hubs && data.hubs.length > 0 ? data.hubs.join(', ') : 'No hubs';
         const metrics = data.metrics || {};
         
         let metricsHtml = '';
@@ -595,7 +595,7 @@ class FPGAVisualizer {
             const bust = `?t=${Date.now()}`;
             conflictVizHtml = `
                 <div class="result-item">
-                    <h4>Konflikt Graf:</h4>
+                    <h4>Conflict Graph:</h4>
                     <div class="visualization-container">
                         <div class="image-container">
                             <img src="/download/${conflictFilename}${bust}" 
@@ -603,8 +603,8 @@ class FPGAVisualizer {
                                  class="visualization-image">
                         </div>
                         <div class="image-actions">
-                            <a href="/download/${conflictFilename}" download class="download-link">Preuzmi sliku</a>
-                            <button onclick="window.open('/download/${conflictFilename}', '_blank')" class="view-link">Otvori u novom prozoru</button>
+                            <a href="/download/${conflictFilename}" download class="download-link">Download image</a>
+                            <button onclick="window.open('/download/${conflictFilename}', '_blank')" class="view-link">Open in new window</button>
                         </div>
                     </div>
                 </div>
@@ -613,14 +613,14 @@ class FPGAVisualizer {
         
         resultsDiv.innerHTML = `
             <div class="results-section">
-                <h3>Rezultati Analize Konflikata</h3>
+                <h3>Conflict Analysis Results</h3>
                 ${conflictVizHtml}
                 <div class="result-item">
-                    <h4>Habovi:</h4>
+                    <h4>Hubs:</h4>
                     <div class="hubs-list">${hubs}</div>
                 </div>
                 <div class="result-item">
-                    <h4>Metrike:</h4>
+                    <h4>Metrics:</h4>
                     <ul class="metrics-list">${metricsHtml}</ul>
                 </div>
             </div>
@@ -688,9 +688,9 @@ class FPGAVisualizer {
     }
 }
 
-// Inicijalizacija kada se stranica učita
+// Initialization when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("🚀 FPGA Visualizer se pokreće...");
+    console.log("🚀 FPGA Visualizer is starting...");
     window.fpgaViz = new FPGAVisualizer();
-    console.log("✅ FPGA Visualizer je spreman!");
+    console.log("✅ FPGA Visualizer is ready!");
 });

@@ -1,5 +1,5 @@
 """
-Analysis modul za FPGA Vizuelizacioni Alat
+Analysis module for the FPGA Visualization Tool
 """
 
 from .conflict_graph import ConflictGraphBuilder

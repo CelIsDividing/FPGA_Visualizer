@@ -4,7 +4,7 @@ from typing import List, Dict
 from models.circuit import Circuit, Signal, Component, Point
 
 class CircuitParser:
-    """Parser za Verilog i BLIF fajlove"""
+    """Parser for Verilog and BLIF files"""
     
     def __init__(self):
         self.wire_pattern = re.compile(r'wire\s+(\w+(?:\s*,\s*\w+)*);')
@@ -12,7 +12,7 @@ class CircuitParser:
         self.module_pattern = re.compile(r'(\w+)\s+(\w+)\s*\((.*?)\)')
     
     def parse_verilog(self, file_path: str) -> Circuit:
-        """Parsira Verilog fajl"""
+        """Parses a Verilog file"""
         circuit_name = self._extract_circuit_name(file_path)
         circuit = Circuit(name=circuit_name)
         
@@ -20,21 +20,21 @@ class CircuitParser:
             with open(file_path, 'r') as file:
                 content = file.read()
                 
-            # Uklanjanje komentara
+            # Removing comments
             content = self._remove_comments(content)
             
-            # Parsiranje po linijama
+            # Parsing line by line
             lines = content.split('\n')
             for line in lines:
                 self._parse_verilog_line(line.strip(), circuit)
                 
         except Exception as e:
-            raise ValueError(f"Greška pri parsiranju Verilog fajla: {e}")
+            raise ValueError(f"Error parsing Verilog file: {e}")
         
         return circuit
     
     def parse_blif(self, file_path: str) -> Circuit:
-        """Parsira BLIF fajl"""
+        """Parses a BLIF file"""
         circuit_name = self._extract_circuit_name(file_path)
         circuit = Circuit(name=circuit_name)
         
@@ -46,16 +46,16 @@ class CircuitParser:
                 self._parse_blif_line(line.strip(), circuit)
                 
         except Exception as e:
-            raise ValueError(f"Greška pri parsiranju BLIF fajla: {e}")
+            raise ValueError(f"Error parsing BLIF file: {e}")
         
         return circuit
     
     def _parse_verilog_line(self, line: str, circuit: Circuit):
-        """Parsira jednu liniju Verilog koda"""
+        """Parses a single line of Verilog code"""
         if not line or line.startswith('//'):
             return
         
-        # Wire deklaracije
+        # Wire declarations
         wire_match = self.wire_pattern.match(line)
         if wire_match:
             wires = [w.strip() for w in wire_match.group(1).split(',')]
@@ -64,13 +64,13 @@ class CircuitParser:
                     circuit.add_signal(Signal(name=wire))
             return
         
-        # Assign statementi
+        # Assign statements
         assign_match = self.assign_pattern.match(line)
         if assign_match:
             target = assign_match.group(1)
             source = assign_match.group(2)
             
-            # Kreiranje signala ako ne postoje
+            # Creating signals if they do not exist
             if not circuit.get_signal(target):
                 circuit.add_signal(Signal(name=target))
             if not circuit.get_signal(source):
@@ -87,15 +87,15 @@ class CircuitParser:
             component = Component(
                 name=instance_name,
                 type=module_type,
-                position=Point(0, 0)  # Podrazumevana pozicija
+                position=Point(0, 0)  # Default position
             )
             
-            # Parsiranje konekcija
+            # Parsing connections
             self._parse_connections(connections_str, component)
             circuit.add_component(component)
     
     def _parse_blif_line(self, line: str, circuit: Circuit):
-        """Parsira jednu liniju BLIF fajla"""
+        """Parses a single line of a BLIF file"""
         if not line or line.startswith('#'):
             return
         
@@ -114,7 +114,7 @@ class CircuitParser:
         elif line.startswith('.names'):
             parts = line[6:].strip().split()
             if len(parts) >= 2:
-                # Poslednji je izlaz, ostali su ulazi
+                # The last one is the output, the rest are inputs
                 output = parts[-1]
                 inputs = parts[:-1]
                 
@@ -129,7 +129,7 @@ class CircuitParser:
                 circuit.add_component(component)
     
     def _parse_connections(self, connections_str: str, component: Component):
-        """Parsira konekcije u Verilog modulu"""
+        """Parses connections in a Verilog module"""
         connections = [c.strip() for c in connections_str.split(',')]
         
         for connection in connections:
@@ -145,48 +145,48 @@ class CircuitParser:
                         component.outputs.append(net)
     
     def _remove_comments(self, content: str) -> str:
-        """Uklanja komentare iz Verilog koda"""
-        # Uklanjanje single-line komentara
+        """Removes comments from Verilog code"""
+        # Removing single-line comments
         content = re.sub(r'//.*', '', content)
-        # Uklanjanje multi-line komentara
+        # Removing multi-line comments
         content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
         return content
     
     def _extract_circuit_name(self, file_path: str) -> str:
-        """Ekstraktuje ime kola iz putanje fajla"""
+        """Extracts the circuit name from the file path"""
         import os
         filename = os.path.basename(file_path)
         name = os.path.splitext(filename)[0]
         return name
     
     def create_test_circuit(self, num_signals: int = 10) -> Circuit:
-        """Kreira test kolo za demonstraciju"""
+        """Creates a test circuit for demonstration"""
         circuit = Circuit(name="Test_Circuit")
         
-        # Dodavanje signala sa nasumičnim rutama
+        # Adding signals with random routes
         import random
         for i in range(num_signals):
             signal = Signal(name=f"signal_{i}")
             
-            # Nasumični source i destination
+            # Random source and destination
             signal.source = Point(random.randint(0, 3), random.randint(0, 10))
             signal.destination = Point(random.randint(0, 2), random.randint(0, 9))
             
-            # Generisanje jednostavne rute
+            # Generating a simple route
             self._generate_simple_route(signal)
             circuit.add_signal(signal)
         
         return circuit
     
     def _generate_simple_route(self, signal: Signal):
-        """Generiše jednostavnu rutu između source i destination"""
+        """Generates a simple route between source and destination"""
         if not signal.source or not signal.destination:
             return
         
         current = Point(signal.source.x, signal.source.y)
         signal.route.append(Point(current.x, current.y))
         
-        # Prvo horizontalno, zatim vertikalno
+        # First horizontally, then vertically
         while current.x != signal.destination.x:
             if current.x < signal.destination.x:
                 current.x += 1

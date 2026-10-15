@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FPGA Vizuelizacioni Alat - Glavna aplikacija
-Proces razvoja informacionih sistema 2025
+FPGA Visualization Tool - Main application
+Information Systems Development Process 2025
 """
 
 import os
@@ -16,7 +16,7 @@ from flask_cors import CORS
 from typing import Dict, List, Optional
 from flask import Flask, render_template, request, jsonify, send_file
 
-# Dodavanje putanje za import modula
+# Adding path for module import
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import settings
@@ -29,14 +29,14 @@ from parsers.routing_parser import RoutingParser
 from visualization.signal_visualizer import SignalVisualizer
 from analysis.conflict_graph import ConflictGraphBuilder
 
-# Globalne promenljive za keširane podatke
+# Global variables for cached data
 cached_routing = None
 cached_architecture = None
 cached_architecture_filename = None
 cached_routing_filename = None
 
 class FPGAVisualizationApp:
-    """Glavna klasa FPGA vizuelizacionog alata"""
+    """Main class of the FPGA visualization tool"""
     
     def __init__(self):
         self.app = Flask(__name__)
@@ -44,26 +44,26 @@ class FPGAVisualizationApp:
         
         CORS(self.app)
 
-        # Inicijalizacija komponenti
+        # Component initialization
         self.architecture_parser = ArchitectureParser()
         self.circuit_parser = CircuitParser()
         self.routing_parser = RoutingParser()
         self.signal_visualizer = SignalVisualizer()
         self.conflict_builder = ConflictGraphBuilder()
         
-        # Podaci aplikacije
+        # Application data
         self.current_architecture: Optional[FPGAArchitecture] = None
         self.current_circuit: Optional[Circuit] = None
         self.current_routing: Optional[RoutingResult] = None
         
-        # Imena učitanih fajlova
+        # Names of loaded files
         self.architecture_filename: Optional[str] = None
         self.routing_filename: Optional[str] = None
         
         self._setup_routes()
     
     def _setup_routes(self):
-        """Podešava Flask rute"""
+        """Sets up Flask routes"""
         
         @self.app.route('/')
         def index():
@@ -71,7 +71,7 @@ class FPGAVisualizationApp:
         
         @self.app.route('/upload/architecture', methods=['POST'])
         def upload_architecture():
-            """Ruta za upload FPGA arhitekture"""
+            """Route for uploading FPGA architecture"""
             if 'file' not in request.files:
                 return jsonify({'error': 'No file uploaded'}), 400
 
@@ -88,7 +88,7 @@ class FPGAVisualizationApp:
             file.save(filepath)
 
             try:
-                    # Pokušaj poziva uobičajenih metoda parsera (parse / parse_xml / parse_architecture_file)
+                    # Attempt to call common parser methods (parse / parse_xml / parse_architecture_file)
                     parser = self.architecture_parser
                     arch = None
                     if hasattr(parser, 'parse'):
@@ -98,18 +98,18 @@ class FPGAVisualizationApp:
                     elif hasattr(parser, 'parse_architecture_file'):
                         arch = parser.parse_architecture_file(filepath)
                     else:
-                        raise RuntimeError('ArchitectureParser nema podržanu metodu za parsiranje')
+                        raise RuntimeError('ArchitectureParser has no supported method for parsing')
 
-                    # Očekuje se da parser vrati instancu FPGAArchitecture
+                    # The parser is expected to return an FPGAArchitecture instance
                     self.current_architecture = arch
-                    self.architecture_filename = filename  # Sačuvaj ime fajla
+                    self.architecture_filename = filename  # Save the file name
                     
-                    # Ažuriraj globalne kešove za vizualizaciju
+                    # Update global caches for visualization
                     global cached_architecture, cached_architecture_filename
                     cached_architecture = arch
                     cached_architecture_filename = filename
 
-                    # Ako objekat ima to_dict, vratiti ga klijentu radi prikaza
+                    # If the object has to_dict, return it to the client for display
                     arch_dict = {}
                     if arch is not None and hasattr(arch, 'to_dict'):
                         arch_dict = arch.to_dict()
@@ -117,8 +117,8 @@ class FPGAVisualizationApp:
                     return jsonify({'success': True, 'architecture': arch_dict})
             except Exception as e:
                 import traceback
-                traceback.print_exc()  # ispisi stack trace u server konzoli
-                # Ako smo u debug modu, vrati i trace u JSON radi lakše dijagnostike
+                traceback.print_exc()  # print stack trace in server console
+                # If we are in debug mode, also return the trace in JSON for easier diagnostics
                 if getattr(settings, 'DEBUG', False):
                     return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 400
                 return jsonify({'error': str(e)}), 400
@@ -127,23 +127,23 @@ class FPGAVisualizationApp:
         def upload_routing():
             """Route for uploading routing results (.route)"""
             print("=" * 50)
-            print("📥 PRIMLJEN ZAHTEV ZA UPLOAD RUTIRANJA")
+            print("📥 UPLOAD REQUEST RECEIVED FOR ROUTING")
             
             if 'file' not in request.files:
-                print("❌ NEMA FAJLA U ZAHTEVU")
+                print("❌ NO FILE IN THE REQUEST")
                 return jsonify({'error': 'No file uploaded'}), 400
 
             file = request.files['file']
-            print(f"📄 FAJL: {file.filename}")
-            print(f"📊 VELIČINA: {len(file.read()) if file else 0} bytes")
+            print(f"📄 FILE: {file.filename}")
+            print(f"📊 SIZE: {len(file.read()) if file else 0} bytes")
             file.seek(0)  # Reset file pointer
             
             if file.filename == '':
-                print("❌ PRAZNO IME FAJLA")
+                print("❌ EMPTY FILE NAME")
                 return jsonify({'error': 'No file selected'}), 400
                 
             if not file.filename.endswith('.route'):
-                print("❌ POGREŠNA EKSTENZIJA")
+                print("❌ WRONG EXTENSION")
                 return jsonify({'error': 'Invalid file type - must be .route'}), 400
 
             try:
@@ -151,25 +151,25 @@ class FPGAVisualizationApp:
                 os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
                 filepath = os.path.join(settings.UPLOAD_FOLDER, file.filename)
                 file.save(filepath)
-                print(f"💾 FAJL SAČUVAN: {filepath}")
+                print(f"💾 FILE SAVED: {filepath}")
 
                 # Require architecture to be loaded first
                 if not self.current_architecture:
-                    print("❌ NIJE UČITANA ARHITEKTURA")
+                    print("❌ ARCHITECTURE NOT LOADED")
                     return jsonify({'error': 'Upload architecture (.xml) before routing file'}), 400
 
-                print("🔍 POČINJEM PARSIRANJE ROUTING FAJLA...")
+                print("🔍 STARTING PARSING OF ROUTING FILE...")
                 # Parse routing file
                 self.current_routing = self.routing_parser.parse_routing_file(
                     filepath,
                     self.current_architecture,
                     self.current_circuit  # Optional
                 )
-                self.routing_filename = file.filename  # Sačuvaj ime fajla
-                print("✅ ROUTING USPEŠNO PARSIRAN")
+                self.routing_filename = file.filename  # Save the file name
+                print("✅ ROUTING PARSED SUCCESSFULLY")
 
                 routing_dict = self.current_routing.to_dict() if self.current_routing else {}
-                print(f"📊 BROJ RUTA: {len(routing_dict.get('routes', []))}")
+                print(f"📊 ROUTE COUNT: {len(routing_dict.get('routes', []))}")
 
                 return jsonify({
                     'success': True,
@@ -177,23 +177,23 @@ class FPGAVisualizationApp:
                 })
 
             except Exception as e:
-                print(f"💥 GREŠKA PRI PARSIRANJU: {str(e)}")
+                print(f"💥 ERROR DURING PARSING: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 400
         
         @self.app.route('/api/parse_routing', methods=['POST'])
         def parse_routing():
-            """Parse .route fajl i vrati listu signala"""
+            """Parse .route file and return a list of signals"""
             global cached_routing, cached_architecture, cached_routing_filename, cached_architecture_filename
             
             try:
                 if 'routing_file' not in request.files:
-                    return jsonify({'success': False, 'error': 'Nema fajla'}), 400
+                    return jsonify({'success': False, 'error': 'No file'}), 400
                 
                 file = request.files['routing_file']
                 if file.filename == '':
-                    return jsonify({'success': False, 'error': 'Prazan fajl'}), 400
+                    return jsonify({'success': False, 'error': 'Empty file'}), 400
                 
                 import tempfile
                 
@@ -206,27 +206,27 @@ class FPGAVisualizationApp:
             
                     with open(tmp_path, 'r', encoding='utf-8') as f:
                         for line in f:
-                            # Traži: "Array size: 10 x 10 logic blocks"
+                            # Search for: "Array size: 10 x 10 logic blocks"
                             match = re.search(r'Array\s+size:\s+(\d+)\s+x\s+(\d+)', line, re.IGNORECASE)
                             if match:
                                 width = int(match.group(1))
                                 height = int(match.group(2))
-                                print(f"✅ Pročitane dimenzije iz .route: {width}×{height}")
+                                print(f"✅ Dimensions read from .route: {width}×{height}")
                                 break
                     
                     parser = RoutingParser()
                     
-                    # KREIRAJ ARHITEKTURU SA PRAVIM DIMENZIJAMA
-                    # Ako arhitektura ne postoji ili dimenzije ne odgovaraju
+                    # CREATE ARCHITECTURE WITH ACTUAL DIMENSIONS
+                    # If the architecture does not exist or the dimensions do not match
                     if cached_architecture is None or \
                     cached_architecture.width != width or \
                     cached_architecture.height != height:
                         from models.fpga_architecture import FPGAArchitecture
                         cached_architecture = FPGAArchitecture(width=width, height=height)
-                        # Samo postavi auto-generated ime ako nije bilo ručno učitane arhitekture
+                        # Only set the auto-generated name if there was no manually loaded architecture
                         if cached_architecture_filename is None or cached_architecture_filename.startswith("Auto-generated"):
                             cached_architecture_filename = f"Auto-generated {width}x{height}"
-                        print(f"🏗️ Kreirana arhitektura: {width}×{height}")
+                        print(f"🏗️ Architecture created: {width}×{height}")
                     
                     routing_result = parser.parse_routing_file(
                         tmp_path, 
@@ -234,11 +234,11 @@ class FPGAVisualizationApp:
                         circuit=None
                     )
                     
-                    # KEŠIRANJE
+                    # CACHING
                     cached_routing = routing_result
                     cached_routing_filename = file.filename
                     
-                    # Izvuci signale
+                    # Extract signals
                     signals = []
                     for route in routing_result.routes:
                         signals.append({
@@ -267,46 +267,46 @@ class FPGAVisualizationApp:
             
         @self.app.route('/upload/circuit', methods=['POST'])
         def upload_circuit():
-            """Ruta za upload kola"""
+            """Route for uploading a circuit"""
             print("=" * 50)
-            print("📥 PRIMLJEN ZAHTEV ZA UPLOAD KOLA")
+            print("📥 UPLOAD REQUEST RECEIVED FOR CIRCUIT")
             
             if 'file' not in request.files:
-                print("❌ NEMA FAJLA U ZAHTEVU")
+                print("❌ NO FILE IN THE REQUEST")
                 return jsonify({'error': 'No file uploaded'}), 400
             
             file = request.files['file']
-            print(f"📄 FAJL: {file.filename}")
-            print(f"📊 VELIČINA: {len(file.read()) if file else 0} bytes")
+            print(f"📄 FILE: {file.filename}")
+            print(f"📊 SIZE: {len(file.read()) if file else 0} bytes")
             
-            # Vrati se na početak fajla
+            # Return to the beginning of the file
             file.seek(0)
             
             if file.filename == '':
-                print("❌ PRAZNO IME FAJLA")
+                print("❌ EMPTY FILE NAME")
                 return jsonify({'error': 'No file selected'}), 400
             
-            # Kreiraj uploads folder ako ne postoji
+            # Create the uploads folder if it does not exist
             os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
             filepath = os.path.join(settings.UPLOAD_FOLDER, file.filename)
             
             try:
                 file.save(filepath)
-                print(f"💾 FAJL SAČUVAN: {filepath}")
+                print(f"💾 FILE SAVED: {filepath}")
                 
                 if file.filename.endswith('.v'):
-                    print("🔧 PARSIRAM VERILOG...")
+                    print("🔧 PARSING VERILOG...")
                     self.current_circuit = self.circuit_parser.parse_verilog(filepath)
                 elif file.filename.endswith('.blif'):
-                    print("🔧 PARSIRAM BLIF...")
+                    print("🔧 PARSING BLIF...")
                     self.current_circuit = self.circuit_parser.parse_blif(filepath)
                 else:
-                    print("❌ NEPODRŽAN FORMAT")
+                    print("❌ UNSUPPORTED FORMAT")
                     return jsonify({'error': 'Unsupported file format. Use .v or .blif'}), 400
                 
-                print(f"✅ KOLO PARSIRANO: {self.current_circuit.name}")
-                print(f"📈 SIGNALI: {len(self.current_circuit.signals)}")
-                print(f"🔧 KOMPONENTE: {len(self.current_circuit.components)}")
+                print(f"✅ CIRCUIT PARSED: {self.current_circuit.name}")
+                print(f"📈 SIGNALS: {len(self.current_circuit.signals)}")
+                print(f"🔧 COMPONENTS: {len(self.current_circuit.components)}")
                 
                 return jsonify({
                     'success': True,
@@ -314,22 +314,22 @@ class FPGAVisualizationApp:
                 })
                 
             except Exception as e:
-                print(f"💥 GREŠKA PRI PARSIRANJU: {e}")
+                print(f"💥 ERROR DURING PARSING: {e}")
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 400
         
         @self.app.route('/api/visualize', methods=['POST'])
         def visualize_selected_signals():
-            """Vizuelizuj samo selektovane signale"""
+            """Visualize only the selected signals"""
             global cached_routing, cached_architecture, cached_architecture_filename, cached_routing_filename
             
             try:
                 if cached_routing is None:
-                    return jsonify({'success': False, 'error': 'Prvo učitaj .route fajl'}), 400
+                    return jsonify({'success': False, 'error': 'Load the .route file first'}), 400
                 
                 if cached_architecture is None:
-                    return jsonify({'success': False, 'error': 'Prvo učitaj arhitekturu'}), 400
+                    return jsonify({'success': False, 'error': 'Load the architecture first'}), 400
                 
                 data = request.get_json()
                 
@@ -342,7 +342,7 @@ class FPGAVisualizationApp:
                 show_signal_labels = data.get('show_signal_labels', True)
                 show_heatmap = data.get('show_heatmap', True)
                 
-                # Dobavi filter informacije
+                # Fetch filter information
                 filter_type = data.get('filter_type', None)
                 filter_value = data.get('filter_value', None)
                 
@@ -353,9 +353,9 @@ class FPGAVisualizationApp:
                 print("=" * 60)
                 
                 if not selected_signals:
-                    return jsonify({'success': False, 'error': 'Nema selektovanih signala'}), 400
+                    return jsonify({'success': False, 'error': 'No signals selected'}), 400
                 
-                # Filtriraj rute
+                # Filter routes
                 filtered_routes = [
                     route for route in cached_routing.routes 
                     if route.net_name in selected_signals
@@ -366,9 +366,9 @@ class FPGAVisualizationApp:
                     print(f"  - {route.net_name}")
                 
                 if not filtered_routes:
-                    return jsonify({'success': False, 'error': 'Selektovani signali ne postoje'}), 400
+                    return jsonify({'success': False, 'error': 'Selected signals do not exist'}), 400
                 
-                # Kreiraj filtrirani routing
+                # Create filtered routing
                 filtered_routing = RoutingResult(
                     routes=filtered_routes,
                     congestion=cached_routing.congestion,
@@ -377,17 +377,17 @@ class FPGAVisualizationApp:
                     successful=True
                 )
                 
-                # Vizuelizacija
+                # Visualization
                 visualizer = SignalVisualizer()
                 
-                # VAŽNO: Pravilna putanja
+                # IMPORTANT: Correct path
                 output_filename = 'routing_visualization.png'
                 output_path = os.path.join(settings.OUTPUT_FOLDER, output_filename)
                 
-                # Kreiraj folder ako ne postoji
+                # Create the folder if it does not exist
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 
-                print(f"📁 Čuvam sliku na: {output_path}")
+                print(f"📁 Saving image to: {output_path}")
                 
                 visualizer.visualize_routing(
                     architecture=cached_architecture,
@@ -407,18 +407,18 @@ class FPGAVisualizationApp:
                     filter_value=filter_value
                 )
                 
-                # PROVERA: Da li fajl postoji?
+                # CHECK: Does the file exist?
                 if not os.path.exists(output_path):
-                    print(f"❌ GREŠKA: Fajl nije kreiran!")
-                    return jsonify({'success': False, 'error': 'Slika nije generisana'}), 500
+                    print(f"❌ ERROR: File was not created!")
+                    return jsonify({'success': False, 'error': 'Image was not generated'}), 500
                 
-                print(f"✅ Slika uspešno kreirana: {os.path.getsize(output_path)} bytes")
+                print(f"✅ Image created successfully: {os.path.getsize(output_path)} bytes")
                 print("=" * 60)
                 
-                # VAŽNO: Vrati samo filename, ne celu putanju
+                # IMPORTANT: Return only the filename, not the whole path
                 return jsonify({
                     'success': True,
-                    'image_path': output_filename,  # Samo ime fajla
+                    'image_path': output_filename,  # Only the file name
                     'signals_visualized': len(filtered_routes)
                 })
             
@@ -429,7 +429,7 @@ class FPGAVisualizationApp:
             
         @self.app.route('/visualize/signals', methods=['POST'])
         def visualize_signals():
-            """Endpoint za vizuelizaciju rutiranja (sliku čuva u OUTPUT folder)"""
+            """Endpoint for routing visualization (saves the image in the OUTPUT folder)"""
             try:
                 if not self.current_architecture:
                     return jsonify({'error': 'Architecture not loaded'}), 400
@@ -444,12 +444,12 @@ class FPGAVisualizationApp:
                 output_folder = getattr(settings, 'OUTPUT_FOLDER', os.path.join(os.getcwd(), 'output'))
                 os.makedirs(output_folder, exist_ok=True)
 
-                # filename i apsolutna putanja
+                # filename and absolute path
                 ts = int(time.time())
                 filename = f"routing_visualization_{ts}.png"
                 abs_path = os.path.join(output_folder, filename)
 
-                # generiši sliku
+                # generate the image
                 if not hasattr(self, 'signal_visualizer'):
                     self.signal_visualizer = SignalVisualizer()
 
@@ -463,8 +463,8 @@ class FPGAVisualizationApp:
                     routing_file=self.routing_filename
                 )
 
-                # frontend očekuje image_path i koristi /download/<path>
-                # vrati relativno u odnosu na OUTPUT (npr. "output/filename.png")
+                # frontend expects image_path and uses /download/<path>
+                # return a path relative to OUTPUT (e.g. "output/filename.png")
                 rel_path = f"output/{filename}"
                 return jsonify({'success': True, 'image_path': rel_path})
 
@@ -475,7 +475,7 @@ class FPGAVisualizationApp:
         
         @self.app.route('/analysis/conflicts', methods=['POST'])
         def analyze_conflicts():
-            """Ruta za analizu konflikata - radi sa routing ili circuit podacima"""
+            """Route for conflict analysis - works with routing or circuit data"""
             global cached_routing
             
             data = request.get_json(silent=True) or {}
@@ -492,7 +492,7 @@ class FPGAVisualizationApp:
                         filtered_routing = cached_routing
                     
                     if not filtered_routing.routes:
-                        return jsonify({'error': 'Nema selektovanih signala za analizu'}), 400
+                        return jsonify({'error': 'No signals selected for analysis'}), 400
                     
                     conflict_graph = self.conflict_builder.build_conflict_graph(filtered_routing)
                     hubs = self.conflict_builder.identify_hubs()
@@ -526,7 +526,7 @@ class FPGAVisualizationApp:
                     hubs = self.conflict_builder.identify_hubs()
                     metrics = self.conflict_builder.calculate_graph_metrics()
                     
-                    # Vizuelizacija konflikt grafa
+                    # Conflict graph visualization
                     fig = self.conflict_builder.visualize_conflict_graph()
                     os.makedirs(settings.OUTPUT_FOLDER, exist_ok=True)
                     
@@ -552,7 +552,7 @@ class FPGAVisualizationApp:
         
         @self.app.route('/analysis/statistics', methods=['GET'])
         def get_statistics():
-            """Ruta za statističku analizu"""
+            """Route for statistical analysis"""
             if not self.current_circuit or not self.current_architecture:
                 return jsonify({'error': 'No circuit or architecture loaded'}), 400
             
@@ -572,12 +572,12 @@ class FPGAVisualizationApp:
         
         @self.app.route('/demo', methods=['GET'])
         def create_demo():
-            """Ruta za kreiranje demo podataka"""
+            """Route for creating demo data"""
             try:
-                # Kreiranje demo arhitekture
+                # Creating demo architecture
                 self.current_architecture = self.architecture_parser.parse_simple_architecture(3, 10)
                 
-                # Kreiranje demo kola
+                # Creating demo circuit
                 self.current_circuit = self.circuit_parser.create_test_circuit(14)
                 
                 return jsonify({
@@ -592,15 +592,15 @@ class FPGAVisualizationApp:
         
         @self.app.route('/download/<path:filename>')
         def download_file(filename):
-            """Ruta za preuzimanje generisanih fajlova"""
+            """Route for downloading generated files"""
             try:
-                # Bezbednost: proveri da filename ne sadrži '..' ili '/'
+                # Security: check that filename does not contain '..' or '/'
                 if '..' in filename or filename.startswith('/'):
                     return jsonify({'error': 'Invalid filename'}), 400
             
                 file_path = os.path.join(settings.OUTPUT_FOLDER, filename)
                 if os.path.exists(file_path):
-                    return send_file(file_path, as_attachment=False)  # as_attachment=False za prikaz u browseru
+                    return send_file(file_path, as_attachment=False)  # as_attachment=False for display in the browser
                 else:
                     return jsonify({'error': 'File not found'}), 404
             except Exception as e:
@@ -608,7 +608,7 @@ class FPGAVisualizationApp:
 
         @self.app.route('/static/output/<path:filename>')
         def static_output_file(filename):
-            """Ruta za statičke fajlove iz output foldera"""
+            """Route for static files from the output folder"""
             try:
                 file_path = os.path.join(settings.OUTPUT_FOLDER, filename)
                 if os.path.exists(file_path):
@@ -620,7 +620,7 @@ class FPGAVisualizationApp:
             
         @self.app.route('/visualize/congestion', methods=['POST'])
         def visualize_congestion():
-            """Ruta za vizuelizaciju zagušenja"""
+            """Route for congestion visualization"""
             if not self.current_architecture or not self.current_routing:
                 return jsonify({'error': 'No architecture or routing results loaded'}), 400
             
@@ -637,7 +637,7 @@ class FPGAVisualizationApp:
                 output_path = os.path.join(settings.OUTPUT_FOLDER, 'congestion_visualization.png')
                 self.congestion_visualizer.save_visualization(output_path)
                 
-                # Generiši izveštaj o zagušenju
+                # Generate a congestion report
                 report = self.congestion_visualizer.generate_congestion_report(
                     self.current_architecture,
                     self.current_routing
@@ -654,7 +654,7 @@ class FPGAVisualizationApp:
 
         @self.app.route('/web/data', methods=['GET'])
         def get_web_data():
-            """Ruta za web vizuelizacione podatke"""
+            """Route for web visualization data"""
             if not self.current_architecture or not self.current_circuit:
                 return jsonify({'error': 'No architecture or circuit loaded'}), 400
             
@@ -677,7 +677,7 @@ class FPGAVisualizationApp:
             
     
     def run(self, host: str = None, port: int = None, debug: bool = None):
-        """Pokreće Flask aplikaciju"""
+        """Starts the Flask application"""
         host = host or settings.HOST
         port = port or settings.PORT
         debug = debug or settings.DEBUG
@@ -686,25 +686,25 @@ class FPGAVisualizationApp:
         print(f"Server running on http://{host}:{port}")
         print(f"Debug mode: {debug}")
         
-        # Kreiranje output direktorijuma ako ne postoji
+        # Creating the output directory if it does not exist
         os.makedirs(settings.OUTPUT_FOLDER, exist_ok=True)
         os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
         
         print(f"📁 Output folder: {os.path.abspath(settings.OUTPUT_FOLDER)}")
         print(f"📁 Upload folder: {os.path.abspath(settings.UPLOAD_FOLDER)}")
         
-        # Proveri permissions
+        # Check permissions
         try:
             test_file = os.path.join(settings.OUTPUT_FOLDER, 'test.txt')
             with open(test_file, 'w') as f:
                 f.write('test')
             os.remove(test_file)
-            print("✅ Output folder je upisiv")
+            print("✅ Output folder is writable")
         except Exception as e:
-            print(f"❌ Problem sa output folderom: {e}")
+            print(f"❌ Problem with the output folder: {e}")
         
-        # Ispis svih registrovanih ruta
-        print("\n📋 Registrovane rute:")
+        # Print all registered routes
+        print("\n📋 Registered routes:")
         for rule in self.app.url_map.iter_rules():
             methods = ', '.join(sorted(rule.methods - {'HEAD', 'OPTIONS'}))
             print(f"  {rule.endpoint:30s} {methods:20s} {rule.rule}")
@@ -713,7 +713,7 @@ class FPGAVisualizationApp:
         self.app.run(host=host, port=port, debug=debug)
 
 def main():
-    """Glavna funkcija za pokretanje aplikacije"""
+    """Main function for starting the application"""
     app = FPGAVisualizationApp()
     app.run()
 

@@ -13,7 +13,7 @@ class Signal:
     is_excluded: bool = False
     
     def calculate_length(self) -> float:
-        """Računa dužinu signala na osnovu rute"""
+        """Computes the signal length based on the route"""
         if len(self.route) < 2:
             return 0.0
         
@@ -27,7 +27,7 @@ class Signal:
         return total_length
     
     def get_bounding_box(self) -> BoundingBox:
-        """Vraća bounding box signala"""
+        """Returns the bounding box of the signal"""
         if not self.route:
             return BoundingBox(0, 0, 0, 0)
         
@@ -56,42 +56,42 @@ class Circuit:
     components: List[Component] = field(default_factory=list)
     
     def add_signal(self, signal: Signal):
-        """Dodaje signal u kolo"""
+        """Adds a signal to the circuit"""
         self.signals.append(signal)
     
     def add_component(self, component: Component):
-        """Dodaje komponentu u kolo"""
+        """Adds a component to the circuit"""
         self.components.append(component)
     
     def get_signal(self, name: str) -> Optional[Signal]:
-        """Vraća signal po imenu"""
+        """Returns a signal by name"""
         for signal in self.signals:
             if signal.name == name:
                 return signal
         return None
     
     def exclude_signals(self, signal_names: List[str]):
-        """Isključuje signale iz analize"""
+        """Excludes signals from the analysis"""
         for signal in self.signals:
             if signal.name in signal_names:
                 signal.is_excluded = True
     
     def include_signals(self, signal_names: List[str]):
-        """Uključuje signale u analizu"""
+        """Includes signals in the analysis"""
         for signal in self.signals:
             if signal.name in signal_names:
                 signal.is_excluded = False
     
     def get_active_signals(self) -> List[Signal]:
-        """Vraća signale koji nisu isključeni"""
+        """Returns the signals that are not excluded"""
         return [signal for signal in self.signals if not signal.is_excluded]
     
     def calculate_total_wire_length(self) -> float:
-        """Računa ukupnu dužinu žica za aktivne signale"""
+        """Computes the total wire length of the active signals"""
         return sum(signal.calculate_length() for signal in self.get_active_signals())
     
     def to_dict(self) -> Dict:
-        """Konvertuje kolo u dictionary za JSON serijalizaciju"""
+        """Converts the circuit to a dictionary for JSON serialization"""
         return {
             'name': self.name,
             'signals': [
@@ -117,7 +117,7 @@ class Circuit:
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'Circuit':
-        """Kreira Circuit iz dictionary"""
+        """Creates a Circuit from a dictionary"""
         circuit = cls(name=data['name'])
         
         for signal_data in data.get('signals', []):

@@ -64,7 +64,7 @@ class LogicBlock:
         self.inputs = inputs
         self.outputs = outputs
         self.name = name
-        # Prihvata sve dodatne atribute koje parser može proslediti
+        # Accepts all additional attributes that the parser may pass through
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -83,7 +83,7 @@ class RoutingChannel:
         self.direction = direction
         self.length = length
         self.capacity = capacity
-        # Dodatni atributi iz parsera (npr. track_ids, segment_type, switches)
+        # Additional attributes from the parser (e.g. track_ids, segment_type, switches)
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -106,7 +106,7 @@ class FPGAArchitecture:
         self.logic_blocks = logic_blocks if logic_blocks is not None else []
         self.routing_channels = routing_channels if routing_channels is not None else []
         self.parameters = parameters if parameters is not None else {}
-        # Sačuvaj sve dodatne informacije (npr. segments, switches, extra metadata)
+        # Store all additional information (e.g. segments, switches, extra metadata)
         for k, v in kwargs.items():
             setattr(self, k, v)
 

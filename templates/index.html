@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="sr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FPGA Vizuelizacioni Alat</title>
+    <title>FPGA Visualization Tool</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         <header class="app-header">
             <div class="header-left">
-                <h1 class="app-title">FPGA Vizuelizacioni Alat</h1>
-                <p class="app-subtitle small">Analiza signala · Rutiranje · Statistika</p>
+                <h1 class="app-title">FPGA Visualization Tool</h1>
+                <p class="app-subtitle small">Signal Analysis · Routing · Statistics</p>
             </div>
             <div class="header-right">
                 <span class="version small">v0.1</span>
@@ -20,17 +20,17 @@
 
         <section class="hero" aria-hidden="true">
             <div class="hero-inner">
-                <h2 class="hero-title">Brza vizuelizacija FPGA signala</h2>
-                <p class="hero-desc small">Učitaj arhitekturu i route.</p>
+                <h2 class="hero-title">Fast FPGA Signal Visualization</h2>
+                <p class="hero-desc small">Load architecture and route.</p>
             </div>
         </section>
 
         <main class="main-content">
-            <!-- Leva kolona: upload & kontrole -->
-            <aside class="upload-panel" aria-label="Kontrole i upload">
+            <!-- Left column: upload & controls -->
+            <aside class="upload-panel" aria-label="Controls and upload">
 
                 <div class="panel-section">
-                    <h3 class="section-title">Upload fajlova</h3>
+                    <h3 class="section-title">File Upload</h3>
                     <div class="file-row">
                         <input id="archFile" type="file" accept=".xml,.json,.yaml,.yml" class="file-input" /> 
                     </div>
@@ -39,98 +39,98 @@
                     </div>
                 </div>
 
-                <!-- Lista signala -->
+                <!-- Signals list -->
                 <div class="panel-section" id="signalsPanel" style="display:none;">
-                    <h3 class="section-title">Signali (<span id="signalCount">0</span>)</h3>
+                    <h3 class="section-title">Signals (<span id="signalCount">0</span>)</h3>
                     
-                    <!-- Filteri za signale -->
+                    <!-- Signal filters -->
                     <div class="filter-section">
-                        <h4 class="filter-title">Filteri</h4>
+                        <h4 class="filter-title">Filters</h4>
                         <select id="filterType" class="filter-select">
-                            <option value="none">Bez filtera</option>
-                            <option value="first">Prvih N signala</option>
-                            <option value="last">Zadnjih N signala</option>
-                            <option value="less_than">Manje od N segmenata</option>
-                            <option value="more_than">Više od N segmenata</option>
+                            <option value="none">No filter</option>
+                            <option value="first">First N signals</option>
+                            <option value="last">Last N signals</option>
+                            <option value="less_than">Fewer than N segments</option>
+                            <option value="more_than">More than N segments</option>
                         </select>
-                        <input type="number" id="filterValue" class="filter-input" placeholder="Unesite N" min="1" value="10">
+                        <input type="number" id="filterValue" class="filter-input" placeholder="Enter N" min="1" value="10">
                         <div class="filter-buttons">
-                            <button id="applyFilterBtn" class="btn-small primary">Potvrdi</button>
-                            <button id="selectAllSignals" class="btn-small">✓ Sve</button>
-                            <button id="deselectAllSignals" class="btn-small">✗ Nijedan</button>
+                            <button id="applyFilterBtn" class="btn-small primary">Apply</button>
+                            <button id="selectAllSignals" class="btn-small">✓ All</button>
+                            <button id="deselectAllSignals" class="btn-small">✗ None</button>
                         </div>
                         
-                        <h4 class="filter-title" style="margin-top: 12px;">Opcije Prikaza</h4>
+                        <h4 class="filter-title" style="margin-top: 12px;">Display Options</h4>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
                                 <input type="checkbox" id="showSignals" checked>
-                                <span>Prikaži signale</span>
+                                <span>Show signals</span>
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="showSignalLabels">
-                                <span>Prikaži labele signala</span>
+                                <span>Show signal labels</span>
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="showDirections">
-                                <span>Prikaži strelice</span>
+                                <span>Show arrows</span>
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="showBoundingBoxes">
-                                <span>Prikaži bounding box-ove</span>
+                                <span>Show bounding boxes</span>
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="showHeatmap">
-                                <span>Heat Mapa</span>
+                                <span>Heat Map</span>
                             </label>
                         </div>
                     </div>
                     
                     <div id="signalsList" class="signals-list">
-                        <!-- Dinamički se popunjava iz JS -->
+                        <!-- Dynamically populated from JS -->
                     </div>
                 </div>
 
                 <div class="panel-section">
-                    <h3 class="section-title">Akcije</h3>
+                    <h3 class="section-title">Actions</h3>
                     <div class="controls-vertical">
-                        <button id="visualizeBtn" class="btn primary">Vizuelizuj Signale</button>
-                        <button id="analyzeBtn" class="btn primary">Analiziraj konflikte</button>
+                        <button id="visualizeBtn" class="btn primary">Visualize Signals</button>
+                        <button id="analyzeBtn" class="btn primary">Analyze Conflicts</button>
                     </div>
                 </div>
                 
-                <!-- Istorija učitanih fajlova -->
+                <!-- History of loaded files -->
                 <div class="panel-section" id="fileHistoryPanel">
-                    <h3 class="section-title">Istorija učitanih fajlova</h3>
+                    <h3 class="section-title">Loaded File History</h3>
                     
                     <div class="file-history-section">
-                        <h4 class="history-subtitle">Arhitektura:</h4>
+                        <h4 class="history-subtitle">Architecture:</h4>
                         <ul id="archHistoryList" class="history-list">
-                            <li class="history-empty">Nema učitanih fajlova</li>
+                            <li class="history-empty">No files loaded</li>
                         </ul>
                     </div>
                     
                     <div class="file-history-section">
                         <h4 class="history-subtitle">Routing:</h4>
                         <ul id="routeHistoryList" class="history-list">
-                            <li class="history-empty">Nema učitanih fajlova</li>
+                            <li class="history-empty">No files loaded</li>
                         </ul>
                     </div>
                 </div>
             </aside>
 
-            <!-- Desna kolona: prikaz rezultata -->
+            <!-- Right column: results display -->
             <section class="visualization-panel" aria-live="polite">
-                <h2 class="panel-title">Rezultati vizuelizacije</h2>
+                <h2 class="panel-title">Visualization Results</h2>
 
                 <div id="visualizationArea" class="visualization-area">
                     <p class="placeholder small center" style="padding:40px; color:#666;">
-                        Ovde će se prikazati rezultati vizuelizacije...
+                        Visualization results will be displayed here...
                     </p>
                 </div>
                 
-                <!-- Sekcija za konflikt graf -->
+                <!-- Conflict graph section -->
                 <div id="conflictResults" class="conflict-results" style="margin-top: 20px;">
-                    <!-- Dinamički popunjava JavaScript -->
+                    <!-- Dynamically populated by JavaScript -->
                 </div>
             </section>
         </main>

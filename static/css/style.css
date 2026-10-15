@@ -504,7 +504,7 @@ button#visualizeBtn:hover {
     font-weight: 600;
 }
 
-/* Animacija za checked stanje */
+/* Animation for checked state */
 .checkbox-label:has(input:checked) {
     background: linear-gradient(135deg, #e8f4fd 0%, #cee5f7 100%);
     border-color: #377eb8;
@@ -514,7 +514,7 @@ button#visualizeBtn:hover {
     transform: scaleY(1);
 }
 
-/* Disabled stanje */
+/* Disabled state */
 .checkbox-label:has(input:disabled) {
     opacity: 0.6;
     cursor: not-allowed;
@@ -526,7 +526,7 @@ button#visualizeBtn:hover {
     box-shadow: none;
 }
 
-/* Fokus pristupačnost */
+/* Focus accessibility */
 .checkbox-label:has(input:focus-visible) {
     outline: 3px solid #377eb8;
     outline-offset: 2px;

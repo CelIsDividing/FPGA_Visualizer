@@ -4,7 +4,7 @@ from .fpga_architecture import FPGAArchitecture
 from .circuit import Circuit
 
 class RouteSegment:
-    """Čvor u routing stablu (ne samo segment!)"""
+    """Node in a routing tree (not just a segment!)"""
     def __init__(self, 
                  node_id: int = 0,
                  node_type: str = '',
@@ -14,7 +14,7 @@ class RouteSegment:
                  switch_id: int = 0,
                  pad: int = -1,
                  **kwargs: Any):
-        # Osnovni VPR atributi
+        # Basic VPR attributes
         self.node_id = node_id
         self.node_type = node_type  # SOURCE, OPIN, CHANX, CHANY, IPIN, SINK
         self.x = x
@@ -23,39 +23,39 @@ class RouteSegment:
         self.switch_id = switch_id
         self.pad = pad
         
-        # Tree struktura
+        # Tree structure
         self.children: List['RouteSegment'] = []
         self.parent: Optional['RouteSegment'] = None
         
-        # Legacy polja (za kompatibilnost)
+        # Legacy fields (for compatibility)
         self.channel_id = kwargs.get('channel_id', 0)
         self.offset = kwargs.get('offset', 0)
         
-        # Dodatni atributi (Pad, Pin, Layer, ...)
+        # Additional attributes (Pad, Pin, Layer, ...)
         for k, v in kwargs.items():
             if k not in ('node_id', 'node_type', 'x', 'y', 'track', 'switch_id', 
                         'channel_id', 'offset', 'pad'):
                 setattr(self, k, v)
     
     def is_io_pad(self) -> bool:
-        """Da li je IO pad (SOURCE/SINK sa Pad oznakom)"""
+        """Whether this is an IO pad (SOURCE/SINK with a Pad label)"""
         return self.pad >= 0
     
     def add_child(self, child: 'RouteSegment'):
-        """Dodaj dete čvor u stablo"""
+        """Adds a child node to the tree"""
         self.children.append(child)
         child.parent = self
     
     def is_leaf(self) -> bool:
-        """Da li je list (SINK čvor)"""
+        """Whether this is a leaf (SINK node)"""
         return len(self.children) == 0 and self.node_type == 'SINK'
     
     def is_root(self) -> bool:
-        """Da li je koren (SOURCE čvor)"""
+        """Whether this is the root (SOURCE node)"""
         return self.parent is None and self.node_type == 'SOURCE'
     
     def get_path_to_root(self) -> List['RouteSegment']:
-        """Vraća putanju od ovog čvora do korena"""
+        """Returns the path from this node to the root"""
         path = [self]
         current = self.parent
         while current:
@@ -64,7 +64,7 @@ class RouteSegment:
         return list(reversed(path))
     
     def get_all_paths_to_leaves(self) -> List[List['RouteSegment']]:
-        """Rekurzivno vraća sve putanje od ovog čvora do listova"""
+        """Recursively returns all paths from this node to the leaves"""
         if self.is_leaf():
             return [[self]]
         
@@ -77,7 +77,7 @@ class RouteSegment:
         return all_paths
     
     def to_dict(self, include_children: bool = False) -> Dict[str, Any]:
-        """Serijalizacija u dict"""
+        """Serialization to a dict"""
         result = {
             'node_id': self.node_id,
             'node_type': self.node_type,
@@ -90,7 +90,7 @@ class RouteSegment:
             'pad': self.pad
         }
         
-        # Dodaj sve custom atribute
+        # Add all custom attributes
         for k, v in self.__dict__.items():
             if k not in result and k not in ('children', 'parent'):
                 result[k] = v
@@ -103,7 +103,7 @@ class RouteSegment:
 
 
 class NetRoute:
-    """Routing stablo za jedan net"""
+    """Routing tree for a single net"""
     def __init__(self, 
                  net_name: str = "", 
                  segments: List[RouteSegment] = None,
@@ -111,22 +111,22 @@ class NetRoute:
                  **kwargs: Any):
         self.net_name = net_name
         
-        # NOVO: root čvor (SOURCE)
+        # NEW: root node (SOURCE)
         self.root = root
         
-        # segments = flat list (za legacy)
+        # segments = flat list (for legacy)
         self.segments = segments if segments is not None else []
         
-        # dodatni atributi
+        # additional attributes
         for k, v in kwargs.items():
             setattr(self, k, v)
     
     def build_tree_from_segments(self):
-        """Konvertuje linearnu listu segmenata u stablo koristeći VPR routing semantiku"""
+        """Converts a linear list of segments into a tree using VPR routing semantics"""
         if not self.segments:
             return
         
-        # Pronađi SOURCE čvor
+        # Find the SOURCE node
         source = next((s for s in self.segments if s.node_type == 'SOURCE'), None)
         if not source:
             return
@@ -245,10 +245,10 @@ class NetRoute:
         return search_tree(self.root)
     
     def _build_tree_recursive(self, current_node: 'RouteSegment', node_map: Dict[int, 'RouteSegment'], visited: set):
-        """Rekurzivno gradi stablo na osnovu routing logike"""
+        """Recursively builds the tree based on routing logic"""
         visited.add(current_node.node_id)
         
-        # Pronađi sledeće čvorove na osnovu routing sekvence
+        # Find the next nodes based on the routing sequence
         next_nodes = self._find_next_nodes(current_node, node_map, visited)
         
         for next_node in next_nodes:
@@ -257,10 +257,10 @@ class NetRoute:
                 self._build_tree_recursive(next_node, node_map, visited)
     
     def _find_next_nodes(self, current: 'RouteSegment', node_map: Dict[int, 'RouteSegment'], visited: set) -> List['RouteSegment']:
-        """Pronalazi sledeće čvorove u routing sekvenci"""
+        """Finds the next nodes in the routing sequence"""
         next_nodes = []
         
-        # Za SOURCE, traži OPIN na istoj lokaciji
+        # For SOURCE, look for an OPIN at the same location
         if current.node_type == 'SOURCE':
             for node in node_map.values():
                 if (node.node_type == 'OPIN' and 
@@ -268,7 +268,7 @@ class NetRoute:
                     node.node_id not in visited):
                     next_nodes.append(node)
         
-        # Za OPIN, traži CHANX/CHANY koji počinje rutiranje
+        # For OPIN, look for a CHANX/CHANY that starts the routing
         elif current.node_type == 'OPIN':
             for node in node_map.values():
                 if (node.node_type in ['CHANX', 'CHANY'] and
@@ -276,7 +276,7 @@ class NetRoute:
                     self._is_adjacent_or_same(current, node)):
                     next_nodes.append(node)
         
-        # Za CHANX/CHANY, traži sledeći routing čvor ili IPIN
+        # For CHANX/CHANY, look for the next routing node or IPIN
         elif current.node_type in ['CHANX', 'CHANY']:
             for node in node_map.values():
                 if (node.node_id not in visited and
@@ -284,7 +284,7 @@ class NetRoute:
                      self._is_routing_continuation(current, node))):
                     next_nodes.append(node)
         
-        # Za IPIN, traži SINK na istoj lokaciji
+        # For IPIN, look for a SINK at the same location
         elif current.node_type == 'IPIN':
             for node in node_map.values():
                 if (node.node_type == 'SINK' and
@@ -295,48 +295,48 @@ class NetRoute:
         return next_nodes
     
     def _is_adjacent_or_same(self, node1: 'RouteSegment', node2: 'RouteSegment') -> bool:
-        """Proverava da li su čvorovi susedni ili na istoj lokaciji"""
+        """Checks whether the nodes are adjacent or at the same location"""
         dx = abs(node1.x - node2.x)
         dy = abs(node1.y - node2.y)
         return (dx <= 1 and dy <= 1)
     
     def _is_routing_continuation(self, current: 'RouteSegment', next_node: 'RouteSegment') -> bool:
-        """Proverava da li je next_node logičko produženje routing putanje"""
-        # CHANX se kreće horizontalno (x menja, y ostaje isto ili +-1)
-        # CHANY se kreće vertikalno (y menja, x ostaje isto ili +-1)
+        """Checks whether next_node is a logical continuation of the routing path"""
+        # CHANX moves horizontally (x changes, y stays the same or +-1)
+        # CHANY moves vertically (y changes, x stays the same or +-1)
         
         if current.node_type == 'CHANX':
             if next_node.node_type == 'CHANY':
-                # Prelaz sa horizontalnog na vertikalni kanal
+                # Transition from horizontal to vertical channel
                 return abs(current.x - next_node.x) <= 1 and abs(current.y - next_node.y) <= 1
             elif next_node.node_type == 'CHANX':
-                # Horizontalni nastavak
+                # Horizontal continuation
                 return current.y == next_node.y and abs(current.x - next_node.x) == 1
             elif next_node.node_type == 'IPIN':
-                # Kraj routing-a - ulaz u CLB
+                # End of routing - entry into CLB
                 return abs(current.x - next_node.x) <= 1 and abs(current.y - next_node.y) <= 1
         
         elif current.node_type == 'CHANY':
             if next_node.node_type == 'CHANX':
-                # Prelaz sa vertikalnog na horizontalni kanal
+                # Transition from vertical to horizontal channel
                 return abs(current.x - next_node.x) <= 1 and abs(current.y - next_node.y) <= 1
             elif next_node.node_type == 'CHANY':
-                # Vertikalni nastavak
+                # Vertical continuation
                 return current.x == next_node.x and abs(current.y - next_node.y) == 1
             elif next_node.node_type == 'IPIN':
-                # Kraj routing-a - ulaz u CLB
+                # End of routing - entry into CLB
                 return abs(current.x - next_node.x) <= 1 and abs(current.y - next_node.y) <= 1
         
         return False
     
     def get_all_source_to_sink_paths(self) -> List[List[RouteSegment]]:
-        """Vraća sve putanje od SOURCE do svih SINK-ova"""
+        """Returns all paths from SOURCE to all SINKs"""
         if not self.root:
             return []
         return self.root.get_all_paths_to_leaves()
     
     def get_path_coordinates(self) -> List[List[tuple]]:
-        """Vraća koordinate svih putanja (za vizuelizaciju)"""
+        """Returns the coordinates of all paths (for visualization)"""
         paths = self.get_all_source_to_sink_paths()
         return [
             [(seg.x, seg.y) for seg in path]
@@ -344,7 +344,7 @@ class NetRoute:
         ]
 
     def to_dict(self, include_tree: bool = True) -> Dict[str, Any]:
-        """Serijalizacija sa tree strukturom"""
+        """Serialization with the tree structure"""
         extra = {k: v for k, v in self.__dict__.items() 
                 if k not in ("net_name", "segments", "root")}
         
@@ -382,12 +382,12 @@ class RoutingResult:
         self.total_wire_length = total_wire_length
         self.iteration_count = iteration_count
         self.timing_data = timing_data if timing_data is not None else {}
-        # prihvati dodatne atribute iz parsera (npr. iteration, stats)
+        # accept additional attributes from the parser (e.g. iteration, stats)
         for k, v in kwargs.items():
             setattr(self, k, v)
 
     def calculate_congestion_metrics(self) -> Dict[str, float]:
-        """Računa različite metrike zagušenja"""
+        """Computes various congestion metrics"""
         if not self.congestion:
             return {}
 
@@ -402,7 +402,7 @@ class RoutingResult:
         }
 
     def get_high_congestion_segments(self, threshold: float = 0.8) -> List[str]:
-        """Vraća segmente sa visokim zagušenjem"""
+        """Returns the segments with high congestion"""
         return [segment for segment, congestion in self.congestion.items()
                 if congestion > threshold]
 
@@ -418,7 +418,7 @@ class RoutingResult:
         }
     
     def get_route_statistics(self) -> Dict[str, Any]:
-        """Statistika routing stabala"""
+        """Statistics of the routing trees"""
         stats = {
             'total_nets': len(self.routes),
             'total_segments': sum(len(r.segments) for r in self.routes),

@@ -11,7 +11,7 @@ from models.fpga_architecture import FPGAArchitecture
 from models.circuit import Circuit, Point, Signal, Component
 
 class RoutingParser:
-    """Parser za VTR routing fajlove (.route) i RRG fajlove"""
+    """Parser for VTR routing files (.route) and RRG files"""
     
     def __init__(self):
         self.net_pattern = re.compile(r'Net\s+(\d+)\s+\((.+?)\)')
@@ -134,7 +134,7 @@ class RoutingParser:
             node_id = int(parts[0])
             node_type = parts[1].upper()
             
-            # Parse koordinate (x,y) ili (x,y,z)
+            # Parse coordinates (x,y) or (x,y,z)
             coord_str = parts[2].strip('()')
             coords = coord_str.split(',')
             x = int(coords[0]) if len(coords) > 0 else -1
@@ -144,7 +144,7 @@ class RoutingParser:
             track = 0
             switch_id = 0
 
-            # Pretrazi sve parove "Keyword: Value"
+            # Search all "Keyword: Value" pairs
             i = 3
             while i < len(parts):
                 key = parts[i].rstrip(':').lower()
@@ -164,7 +164,7 @@ class RoutingParser:
                         i += 2
                         continue
                 except ValueError:
-                    pass  # Preskoči ako nije broj
+                    pass  # Skip if not a number
                 
                 i += 1
             
@@ -198,7 +198,7 @@ class RoutingParser:
                 **extra_attrs  # Pad, Pin, Class, ...
             )
             
-            # Debug: IO pad detekcija
+            # Debug: IO pad detection
             if node_type in ['SOURCE', 'SINK', 'OPIN', 'IPIN'] and hasattr(seg, 'pad') and seg.pad >= 0:
                 print(f"    🔌 IO PAD detected: Node {node_id} has pad={seg.pad}")
             
@@ -213,13 +213,13 @@ class RoutingParser:
             return None
         
     def _parse_placement_info(self, content: str, routing_result: RoutingResult):
-        """Parsira informacije o placement-u iz header-a"""
+        """Parses placement information from the header"""
         lines = content.split('\n')
         
         for line in lines:
             line = line.strip()
             
-            # Parsiranje dimenzija array-a
+            # Parsing array dimensions
             placement_match = self.placement_pattern.search(line)
             if placement_match:
                 width = int(placement_match.group(1))
@@ -228,7 +228,7 @@ class RoutingParser:
                 break
     
     def _parse_net_routes(self, content: str, circuit: Circuit):
-        """Parsira rute za svaki net u .route fajlu"""
+        """Parses routes for each net in the .route file"""
         lines = content.split('\n')
         current_net = None
         current_route = []
@@ -236,28 +236,28 @@ class RoutingParser:
         for line in lines:
             line = line.strip()
             
-            # Početak novog net-a
+            # Start of a new net
             net_match = self.net_pattern.match(line)
             if net_match:
-                # Sačuvaj prethodni net ako postoji
+                # Save the previous net if it exists
                 if current_net and current_route:
                     self._process_net_route(current_net, current_route, circuit)
                 
-                # Započni novi net
+                # Start a new net
                 net_id = net_match.group(1)
                 net_name = net_match.group(2)
                 current_net = (net_id, net_name)
                 current_route = []
                 continue
             
-            # Parsiranje čvorova u rutu
+            # Parsing nodes in the route
             node_match = self.node_pattern.match(line)
             if node_match and current_net:
                 node_id = node_match.group(1)
                 node_type = node_match.group(2)
                 location_str = node_match.group(3)
                 
-                # Parsiranje koordinata
+                # Parsing coordinates
                 coord_match = self.coord_pattern.search(location_str)
                 if coord_match:
                     x = int(coord_match.group(1))
@@ -273,7 +273,7 @@ class RoutingParser:
                         'raw_line': line
                     }
                     
-                    # Parsiranje dodatnih informacija
+                    # Parsing additional information
                     track_match = self.track_pattern.search(line)
                     if track_match:
                         node_info['track'] = int(track_match.group(1))
@@ -285,21 +285,21 @@ class RoutingParser:
                     
                     current_route.append(node_info)
         
-        # Obradi poslednji net
+        # Process the last net
         if current_net and current_route:
             self._process_net_route(current_net, current_route, circuit)
     
     def _process_net_route(self, net_info: tuple, route_nodes: List[Dict], circuit: Circuit):
-        """Procesuira rutu jednog net-a i kreira odgovarajući signal"""
+        """Processes the route of a single net and creates the corresponding signal"""
         net_id, net_name = net_info
         
-        # Pronađi ili kreiraj signal
+        # Find or create the signal
         signal = circuit.get_signal(net_name)
         if not signal:
             signal = Signal(name=net_name)
             circuit.add_signal(signal)
         
-        # Postavi rutu signala
+        # Set the signal route
         signal.route = []
         source_node = None
         sink_nodes = []
@@ -308,21 +308,21 @@ class RoutingParser:
             point = Point(node['x'], node['y'])
             signal.route.append(point)
             
-            # Identifikuj source i sink čvorove
+            # Identify source and sink nodes
             if node['type'] == 'SOURCE':
                 signal.source = point
                 source_node = node
             elif node['type'] == 'SINK':
                 sink_nodes.append(node)
         
-        # Ako nema eksplicitnog SINK-a, koristi poslednju tačku
+        # If there is no explicit SINK, use the last point
         if not signal.destination and signal.route:
             signal.destination = signal.route[-1]
         
-        # Izračunaj dužinu rute
+        # Calculate the route length
         signal.calculate_length()
         
-        # Dodaj metapodatke o net-u
+        # Add metadata about the net
         signal.metadata = {
             'net_id': net_id,
             'node_count': len(route_nodes),
@@ -331,11 +331,11 @@ class RoutingParser:
         }
     
     def _analyze_route_congestion(self, content: str, architecture: FPGAArchitecture) -> Dict[str, float]:
-        """Analizira zagušenje na osnovu parsiranih ruta"""
+        """Analyzes congestion based on the parsed routes"""
         congestion_map = {}
         segment_usage = {}
         
-        # Parsiranje svih čvorova iz .route fajla
+        # Parsing all nodes from the .route file
         lines = content.split('\n')
         
         for line in lines:
@@ -345,14 +345,14 @@ class RoutingParser:
                 node_type = node_match.group(2)
                 location_str = node_match.group(3)
                 
-                # Fokusiramo se na routing čvorove (CHANX, CHANY)
+                # We focus on routing nodes (CHANX, CHANY)
                 if node_type in ['CHANX', 'CHANY']:
                     coord_match = self.coord_pattern.search(location_str)
                     if coord_match:
                         x = int(coord_match.group(1))
                         y = int(coord_match.group(2))
                         
-                        # Parsiranje track broja
+                        # Parsing the track number
                         track_match = self.track_pattern.search(line)
                         if track_match:
                             track = int(track_match.group(1))
@@ -362,7 +362,7 @@ class RoutingParser:
                         
                         segment_usage[segment_key] = segment_usage.get(segment_key, 0) + 1
         
-        # Računanje zagušenja
+        # Computing congestion
         if segment_usage:
             max_usage = max(segment_usage.values())
             for segment_key, usage in segment_usage.items():
@@ -371,20 +371,20 @@ class RoutingParser:
         return congestion_map
     
     def _parse_timing_info(self, content: str, routing_result: RoutingResult):
-        """Parsira informacije o vremenu izvršavanja ako su dostupne"""
+        """Parses execution time information if available"""
         lines = content.split('\n')
         
         for line in lines:
             line = line.strip().lower()
             
             if 'routing time' in line:
-                # Pokušaj da ekstraktuješ vreme
+                # Try to extract the time
                 time_parts = line.split(':')
                 if len(time_parts) > 1:
                     time_str = time_parts[1].strip()
-                    # Pokušaj da konvertuješ u float
+                    # Try to convert to float
                     try:
-                        # Ukloni ne-numeričke karaktere osim decimalne tačke
+                        # Remove non-numeric characters except the decimal point
                         time_clean = ''.join(c for c in time_str if c.isdigit() or c == '.')
                         if time_clean:
                             routing_time = float(time_clean)
@@ -394,35 +394,35 @@ class RoutingParser:
     
     def parse_rrg_file(self, file_path: str, architecture: FPGAArchitecture, 
                       circuit: Circuit) -> RoutingResult:
-        """Parsira VTR RRG fajl za routing resurse"""
+        """Parses a VTR RRG file for routing resources"""
         routing_result = RoutingResult(circuit=circuit, architecture=architecture)
         
         try:
             tree = ET.parse(file_path)
             root = tree.getroot()
             
-            # Parsiranje rr_nodes
+            # Parsing rr_nodes
             self._parse_rr_nodes(root, circuit)
             
-            # Parsiranje rr_edges za konekcije
+            # Parsing rr_edges for connections
             self._parse_rr_edges(root, circuit)
             
-            # Analiza zagušenja na osnovu kapaciteta i korišćenja
+            # Analyzing congestion based on capacity and usage
             congestion_map = self._analyze_rrg_congestion(root, architecture)
             routing_result.congestion_map = congestion_map
             
-            # Računanje ukupne dužine žica
+            # Computing total wire length
             routing_result.total_wire_length = circuit.calculate_total_wire_length()
             
             routing_result.successful = True
             
         except Exception as e:
-            raise ValueError(f"Greška pri parsiranju RRG fajla: {e}")
+            raise ValueError(f"Error parsing RRG file: {e}")
         
         return routing_result
     
     def _parse_rr_nodes(self, root: ET.Element, circuit: Circuit):
-        """Parsira rr_nodes sekciju iz RRG fajla"""
+        """Parses the rr_nodes section from the RRG file"""
         rr_nodes_element = root.find('rr_nodes')
         if rr_nodes_element is None:
             return
@@ -432,14 +432,14 @@ class RoutingParser:
             node_type = node_elem.get('type', '')
             capacity = int(node_elem.get('capacity', '1'))
             
-            # Parsiranje lokacije
+            # Parsing the location
             loc_elem = node_elem.find('loc')
             if loc_elem is not None:
                 x = int(loc_elem.get('xlow', '0'))
                 y = int(loc_elem.get('ylow', '0'))
                 ptc = int(loc_elem.get('ptc', '0'))
                 
-                # Kreiranje signala za relevantne tipove čvorova
+                # Creating signals for relevant node types
                 if node_type in ['SOURCE', 'OPIN']:
                     signal_name = f"node_{node_id}_{node_type}"
                     signal = circuit.get_signal(signal_name)
@@ -461,15 +461,15 @@ class RoutingParser:
                     if not signal.route:
                         signal.route.append(Point(x, y))
                     else:
-                        signal.route[-1] = Point(x, y)  # Ažuriranje destinacije
+                        signal.route[-1] = Point(x, y)  # Updating destination
     
     def _parse_rr_edges(self, root: ET.Element, circuit: Circuit):
-        """Parsira rr_edges sekciju za konekcije između čvorova"""
+        """Parses the rr_edges section for connections between nodes"""
         rr_edges_element = root.find('rr_edges')
         if rr_edges_element is None:
             return
         
-        # Prvo skupimo sve edge-ove
+        # First we collect all edges
         edges = []
         for edge_elem in rr_edges_element.findall('edge'):
             src_node = int(edge_elem.get('src_node', '0'))
@@ -477,31 +477,31 @@ class RoutingParser:
             switch_id = int(edge_elem.get('switch_id', '0'))
             edges.append((src_node, sink_node, switch_id))
         
-        # Povezivanje signala na osnovu edge-ova
+        # Linking signals based on edges
         for src_node, sink_node, switch_id in edges:
             src_signal_name = f"node_{src_node}_SOURCE"
             sink_signal_name = f"node_{sink_node}_SINK"
             
-            # Pokušaj da pronađeš i povežeš signale
+            # Try to find and link the signals
             src_signal = circuit.get_signal(src_signal_name)
             sink_signal = circuit.get_signal(sink_signal_name)
             
             if src_signal and sink_signal:
-                # Spajanje signala
+                # Merging signals
                 sink_signal.source = src_signal.source
                 if src_signal.route:
                     sink_signal.route = src_signal.route.copy()
     
     def _analyze_rrg_congestion(self, root: ET.Element, architecture: FPGAArchitecture) -> Dict[str, float]:
-        """Analizira zagušenje na osnovu RRG čvorova"""
+        """Analyzes congestion based on RRG nodes"""
         congestion_map = {}
         
-        # Analiza korišćenja routing resursa
+        # Analysis of routing resource usage
         rr_nodes_element = root.find('rr_nodes')
         if rr_nodes_element is None:
             return congestion_map
         
-        # Brojanje čvorova po lokacijama
+        # Counting nodes by locations
         location_usage = {}
         for node_elem in rr_nodes_element.findall('node'):
             loc_elem = node_elem.find('loc')
@@ -513,7 +513,7 @@ class RoutingParser:
                 location_key = f"{x},{y}"
                 location_usage[location_key] = location_usage.get(location_key, 0) + 1
         
-        # Računanje zagušenja
+        # Computing congestion
         max_usage = max(location_usage.values()) if location_usage else 1
         
         for location_key, usage in location_usage.items():
@@ -523,10 +523,10 @@ class RoutingParser:
     
     def parse_simple_routing(self, architecture: FPGAArchitecture, 
                            circuit: Circuit) -> RoutingResult:
-        """Generiše jednostavne routing rezultate za testiranje"""
+        """Generates simple routing results for testing"""
         routing_result = RoutingResult(circuit=circuit, architecture=architecture)
         
-        # Generisanje nasumičnog zagušenja za routing kanale
+        # Generating random congestion for routing channels
         congestion_map = {}
         for channel in architecture.routing_channels:
             congestion_map[str(channel.segment_id)] = min(1.0, max(0.0, 0.3 + 0.5 * (channel.segment_id % 3) / 3))
@@ -560,7 +560,7 @@ class RoutingParser:
             print(f"Error exporting routing summary: {e}")
 
     def _calculate_tree_statistics(self, routes: List[NetRoute]) -> Dict[str, Any]:
-        """Računa statistiku routing stabala"""
+        """Computes routing tree statistics"""
         stats = {
             'nets_with_branches': 0,
             'max_fanout': 0,

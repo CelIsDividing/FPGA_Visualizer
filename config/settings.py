@@ -3,17 +3,17 @@ from dataclasses import dataclass
 
 @dataclass
 class Settings:
-    # Putanje
+    # Paths
     UPLOAD_FOLDER = "uploads"
     OUTPUT_FOLDER = "output"
     STATIC_FOLDER = "static"
     
-    # Vizuelizacija
+    # Visualization
     CELL_SIZE = 100  # Increased from 50 for better visibility
     CANVAS_PADDING = 100
     SIGNAL_COLORS = ['red', 'green', 'blue', 'magenta', 'cyan', 'orange']
     
-    # Analiza
+    # Analysis
     CONGESTION_THRESHOLD = 0.8
     HUB_CENTRALITY_THRESHOLD = 0.1
     
@@ -24,6 +24,6 @@ class Settings:
 
 settings = Settings()
 
-# Kreiranje direktorijuma ako ne postoje
+# Create directories if they don't exist
 os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(settings.OUTPUT_FOLDER, exist_ok=True)
